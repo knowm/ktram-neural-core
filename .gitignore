@@ -1,0 +1,22 @@
+# Private planning / spec — do NOT publish to the public repo
+planning/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Generated example figures (any lesson's local figures/ output dir)
+figures/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

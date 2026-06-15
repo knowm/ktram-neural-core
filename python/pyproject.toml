@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ktram-neural-core"
+version = "0.0.1"
+description = "Open emulator of kT-RAM realized as a 2-1 neural lane (unit crossbars, differential pairs, AAT selection)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Knowm Inc." }]
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+examples = ["matplotlib>=3.5"]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ktram_neural_core*"]
