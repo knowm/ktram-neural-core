@@ -287,9 +287,9 @@ init (`randVar=0`) draws nothing from the RNG.
 
 ---
 
-## Read noise — the kT in kT-bit
+## Read noise
 
-This is the emulator's defining feature, configured on the `Core` and applied in `read_sample`.
+Configured on the `Core` and applied in `read_sample`.
 A read carries **two physically distinct noise mechanisms**, summed in quadrature and referred
 to the weight (`y = Vy/V_app`):
 
@@ -299,9 +299,9 @@ to the weight (`y = Vy/V_app`):
 σ_y       = sqrt(σ_thermal² + σ_flicker²)
 ```
 
-Two mechanisms, because real memristor read noise is not just thermal. Each has its own shape;
-each carries a tuning constant that folds in the parts the emulator does not model from first
-principles (read bandwidth, 1/f corner, the Hooge factor).
+Two mechanisms, because real memristor read noise has more than one source. Each has its own
+functional form; each carries a tuning constant that folds in the parts the emulator does not
+model from first principles (read bandwidth, 1/f corner, the Hooge factor).
 
 **Thermal (Johnson–Nyquist)** — additive voltage noise over the signal. The node sees the two
 memristors in parallel, so its thermal voltage noise is `4·k_B·T / (Ga+Gb)` per unit bandwidth;
@@ -310,7 +310,7 @@ This is the small floor (`noise_thermal` default `0.1`).
 
 **Flicker / RTN (1/f)** — multiplicative conductance fluctuation (`δG/G`), the *dominant* read
 noise in real memristors. Propagating `δGa, δGb` through `y = (Ga−Gb)/(Ga+Gb)` gives a `(1 − y²)`
-shape and **no `V_app` dependence**. This is the larger term (`noise_flicker` default `1.0`).
+factor and **no `V_app` dependence**. This is the larger term (`noise_flicker` default `1.0`).
 
 The knobs, in the order you'd actually reach for them:
 
@@ -319,12 +319,12 @@ The knobs, in the order you'd actually reach for them:
    is non-disturbing, so `forward_low_voltage` + `FFLV`/`RFLV` is the knob for noisy,
    state-preserving reads — e.g. biased random-bit generation. The `noise ∈ [0,1]` argument to
    `evaluate` drives this same dial. **But the flicker term is flat in voltage**, so it sets a
-   floor the dial cannot go below — the physically honest behavior.
+   floor the dial cannot go below — the real device floor.
 2. **Weight `y` — automatic.** The flicker term carries `(1 − y²)`: loudest when the synapse is
    undecided (`y = 0`), vanishing at the rails (`y = ±1`, a confident pair reads quiet).
 3. **Magnitude `m`** — automatic. A confident (high-`m`) pair reads quietly, as `1/sqrt(m)` in
    both terms. `m` is the common-mode sum over the active pairs, so a multi-pair lane's noise
-   scales with the total magnitude. Together the `(1 − y²)` and `1/sqrt(m)` shapes track a
+   scales with the total magnitude. Together the `(1 − y²)` and `1/sqrt(m)` factors track a
    Beta-posterior width, so a read's spread narrows toward certainty in both weight and
    magnitude — a read is a posterior-shaped sample.
 4. **Temperature `T`** — the `sqrt(T)` dependence of the thermal term; settable, room-temp
@@ -401,6 +401,6 @@ experiments in that file: the five FF-feedback combos, read decay-vs-growth (`FF
 read-only), low-voltage reads, the matched-weight/mismatched-magnitude "inertia" pair, and the
 MSS random-bit-generation demo.
 
-Runnable notebooks and scripts live in `python/examples/` (`synapse_review.ipynb`,
+Runnable notebooks and scripts are in `python/examples/` (`synapse_review.ipynb`,
 `compare_instructions.ipynb`, `iv_hysteresis.ipynb`, `generate_figures.py`). Tests are in
 `python/tests/` — run `pytest` from `python/`.
