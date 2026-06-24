@@ -51,13 +51,15 @@ class NeuralLane:
                 v_app = v_app * max(self._NOISE_FLOOR, 1.0 - noise)
             top, bottom = self.topology.readout(s.conductances(a) for s, a in active)
             if bottom != 0.0:
-                # The devices are driven by the *clean* read, so state evolution stays
-                # deterministic and low-voltage reads stay exactly non-disturbing. The
-                # *retained* y carries the read noise — it is what H() and any threshold
-                # see, and what evaluate() returns (bottom is the total common mode sum(m_i)).
+                # One junction node, one noisy Vy. The hiss the read carries is a real
+                # voltage on that node, so the *same* draw that we report also drives the
+                # back-action — sample once, drive with it. A sub-threshold read still
+                # leaves the state untouched, not because we scrub the signal but because
+                # the device does not switch below threshold. (bottom is the total common
+                # mode sum(m_i); read_sample draws at the read pulse width's bandwidth.)
                 y_clean = top / bottom
-                vy = v_app * y_clean
                 self.y = self.core.read_sample(y_clean, bottom, v_app)
+                vy = v_app * self.y
             else:
                 self.y = 0.0
                 vy = 0.0

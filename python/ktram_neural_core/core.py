@@ -25,29 +25,35 @@ from .unit_crossbar import UnitCrossbar, UnitCrossbarPair
 #   sigma_y = sqrt(sigma_thermal^2 + sigma_flicker^2)
 #
 #   * thermal (Johnson-Nyquist) — additive voltage noise over the signal:
-#       sigma_thermal = read_noise * noise_thermal * sqrt(T/T_ref) * (V_ref/|V_app|) * sqrt(m_ref/m)
+#       sigma_thermal = read_noise * noise_thermal * sqrt(T/T_ref) * (V_ref/|V_app|)
+#                       * sqrt(m_ref/m) * sqrt(pw_ref/pw)
 #     Scales as 1/|V_app| (lower the read voltage -> louder read; the operational noise dial),
-#     sqrt(T) (temperature), and 1/sqrt(m) (a high-magnitude pair reads quietly). Flat in y.
+#     sqrt(T) (temperature), 1/sqrt(m) (a high-magnitude pair reads quietly), and 1/sqrt(pw):
+#     white power is proportional to the read bandwidth Df ~= 1/(2*pw), so a longer read pulse
+#     integrates the hiss down. Flat in y.
 #   * flicker / RTN (1/f) — multiplicative conductance fluctuation (dG/G), the dominant read
 #     noise in real memristors:
-#       sigma_flicker = read_noise * noise_flicker * (1 - y^2) * sqrt(m_ref/m)
+#       sigma_flicker = read_noise * noise_flicker * (1 - y^2) * sqrt(m_ref/m) * bw_flicker
 #     Flat in |V_app| — a floor the read-voltage dial cannot go below — also 1/sqrt(m), and
 #     (1 - y^2): loudest at y = 0 (undecided), vanishing at the rails (a confident pair reads
-#     quiet). The 1/f corner, Hooge factor and read bandwidth are folded into noise_flicker.
+#     quiet). 1/f power goes as ln(f_high/f_low); the read pulse sets the upper edge
+#     f_high ~= 1/(2*pw), so bw_flicker carries a weak sqrt(ln) dependence on pw, spanning
+#     FLICKER_DECADES of 1/f band at the reference pulse width. The Hooge factor is in noise_flicker.
 #
-# read_noise is the master gain quoted at the reference operating point (read voltage
-# READ_NOISE_REF_V, m = m_ref, T = ROOM_TEMPERATURE_K); noise_thermal and noise_flicker set the
-# mix, so at the reference point sigma_y = read_noise * sqrt(noise_thermal^2 + noise_flicker^2).
-# The constant part is precomputed (see _recompute_noise_coeffs) and only m, V_app and y are
-# evaluated per read. Read noise is ON by default; read_noise = 0 gives a deterministic Core
-# (draws nothing). The noise rides only on the returned value (what H() and any threshold see) —
-# the devices are driven by the clean read, so state stays deterministic and a sub-threshold read
-# stays exactly non-disturbing. pulse_width is unrelated — it is the write/state-update time.
+# Both terms come from one junction node at the read pulse's bandwidth: the SAME draw is reported
+# and drives the back-action (see NeuralLane.evaluate). read_noise is the master gain quoted at the
+# reference operating point (read voltage READ_NOISE_REF_V, m = m_ref, T = ROOM_TEMPERATURE_K,
+# pw = pw_ref); noise_thermal and noise_flicker set the mix, so at the reference point
+# sigma_y = read_noise * sqrt(noise_thermal^2 + noise_flicker^2). The constant part is precomputed
+# (see _recompute_noise_coeffs) and only m, V_app, y and pw are evaluated per read. Read noise is ON
+# by default; read_noise = 0 gives a deterministic Core (draws nothing). A sub-threshold read stays
+# non-disturbing because the device does not switch below threshold, not because the read is clean.
 ROOM_TEMPERATURE_K = 298.0
 READ_NOISE_REF_V = 0.05   # reference read voltage at which the noise constants are quoted
 READ_NOISE = 0.02         # master read-noise gain (0 disables read noise entirely)
 NOISE_THERMAL = 0.1       # thermal (Johnson) weight — a small floor
 NOISE_FLICKER = 1.0       # flicker / RTN (1/f) weight — the dominant term
+FLICKER_DECADES = 6.0     # decades of 1/f band at the reference pulse width (sets pw sensitivity)
 
 # Model-aware Core defaults: drive/low voltages and pulse width. The Core initializes from
 # the chosen model; all stay settable. RS gets pulse_width 1e-8 so its old alpha*dt = 0.01
@@ -82,6 +88,8 @@ class Core:
         noise_flicker=NOISE_FLICKER,
         temperature=ROOM_TEMPERATURE_K,
         read_noise_ref_m=None,
+        read_noise_ref_pw=None,
+        flicker_decades=FLICKER_DECADES,
     ):
         self.crossbar_rows = crossbar_rows
         self.crossbar_cols = crossbar_cols
@@ -137,6 +145,12 @@ class Core:
             if read_noise_ref_m is not None
             else self._lanes[0].spaces[0].a.device_at(0).GMAX
         )
+        # The read pulse width sets the noise bandwidth; the reference pulse width anchors it so
+        # the quoted gains hold at the model's default pulse width and only deviations rescale.
+        self.read_noise_ref_pw = (
+            read_noise_ref_pw if read_noise_ref_pw is not None else self.pulse_width
+        )
+        self.flicker_decades = flicker_decades
         self._recompute_noise_coeffs()
 
     # ----- construction -----
@@ -204,6 +218,9 @@ class Core:
         )
         self._a_flicker = self.read_noise * self.noise_flicker
         self._sqrt_ref_m = math.sqrt(self.read_noise_ref_m)
+        # ln of the 1/f band at the reference pulse width (f_high_ref/f_low). The read pulse
+        # only moves the upper edge, so off-reference the band is this plus ln(pw_ref/pw).
+        self._flicker_ln_ref = self.flicker_decades * math.log(10.0)
 
     def read_sample(self, y_clean, m, v_app):
         """Read noise on the *reported* read — the kT-bit's hiss.
@@ -211,29 +228,35 @@ class Core:
         Two physically distinct mechanisms, summed in quadrature and referred to the weight
         (y = Vy/V_app):
 
-            sigma_thermal = a_thermal * sqrt(m_ref/m) / |V_app|        (Johnson-Nyquist)
-            sigma_flicker = a_flicker * (1 - y^2) * sqrt(m_ref/m)      (1/f flicker / RTN)
+            Df            = 1 / (2 * pw)                              read bandwidth
+            sigma_thermal = a_thermal * sqrt(m_ref/m) / |V_app| * sqrt(pw_ref/pw)   (Johnson-Nyquist)
+            sigma_flicker = a_flicker * (1 - y^2) * sqrt(m_ref/m) * bw_flicker       (1/f flicker / RTN)
             sigma_y       = sqrt(sigma_thermal^2 + sigma_flicker^2)
 
         where a_thermal and a_flicker are the precomputed gains (see _recompute_noise_coeffs).
         Thermal is additive voltage noise over the signal: 1/|V_app| (the read-voltage noise
-        dial), sqrt(T), 1/sqrt(m), flat in y. Flicker is the dominant memristor read noise —
-        multiplicative conductance fluctuation: flat in |V_app| (a floor the dial cannot clear),
-        1/sqrt(m), and (1 - y^2) (loudest undecided at y = 0, silent at the rails). m is the
-        common mode summed over the read's active pairs, so a multi-pair lane's noise scales with
-        the TOTAL magnitude with no per-pair handling.
+        dial), sqrt(T), 1/sqrt(m), 1/sqrt(pw) (white power follows the read bandwidth), flat in y.
+        Flicker is the dominant memristor read noise — multiplicative conductance fluctuation: flat
+        in |V_app| (a floor the dial cannot clear), 1/sqrt(m), (1 - y^2) (loudest undecided at
+        y = 0, silent at the rails), and a weak sqrt(ln) growth as a longer read pulse lowers the
+        upper edge of the 1/f band. m is the common mode summed over the read's active pairs, so a
+        multi-pair lane's noise scales with the TOTAL magnitude with no per-pair handling.
 
-        Noise rides only on the returned value (the y that H() and any threshold see); the
-        caller drives the devices with the clean read, so state stays deterministic and a
-        sub-threshold read stays exactly non-disturbing. The single draw comes from the Core's
-        seeded RNG. read_noise <= 0 returns the clean read untouched and draws nothing, so a
-        noise-disabled Core reproduces the deterministic output bit-for-bit.
+        The single draw comes from the Core's seeded RNG and is the same hiss the caller drives the
+        back-action with — one junction node at one bandwidth (see NeuralLane.evaluate). read_noise
+        <= 0 returns the clean read untouched and draws nothing, so a noise-disabled Core is
+        deterministic bit-for-bit.
         """
         if self.read_noise <= 0.0 or m <= 0.0:
             return y_clean
         f_m = self._sqrt_ref_m / math.sqrt(m)
-        sigma_thermal = self._a_thermal * f_m / abs(v_app)
-        sigma_flicker = self._a_flicker * (1.0 - y_clean * y_clean) * f_m
+        # Read bandwidth from the pulse width: white (thermal) power ~ Df ~ 1/pw -> sigma ~ 1/sqrt(pw);
+        # 1/f (flicker) power ~ ln(band), and the pulse only moves the band's upper edge.
+        bw_thermal = math.sqrt(self.read_noise_ref_pw / self.pulse_width)
+        ln_band = self._flicker_ln_ref + math.log(self.read_noise_ref_pw / self.pulse_width)
+        bw_flicker = math.sqrt(ln_band / self._flicker_ln_ref) if ln_band > 0.0 else 0.0
+        sigma_thermal = self._a_thermal * f_m / abs(v_app) * bw_thermal
+        sigma_flicker = self._a_flicker * (1.0 - y_clean * y_clean) * f_m * bw_flicker
         sigma = math.sqrt(sigma_thermal * sigma_thermal + sigma_flicker * sigma_flicker)
         y = y_clean + sigma * self.rng.standard_normal()
         return -1.0 if y < -1.0 else (1.0 if y > 1.0 else y)
@@ -260,7 +283,8 @@ class Core:
         self.pulse_width = dt
 
     def set_read_noise(self, read_noise=None, noise_thermal=None, noise_flicker=None,
-                       temperature=None, read_noise_ref_m=None):
+                       temperature=None, read_noise_ref_m=None, read_noise_ref_pw=None,
+                       flicker_decades=None):
         """Tune the read-noise gains at runtime; read_noise=0 disables read noise entirely.
 
         read_noise is the master gain; noise_thermal and noise_flicker set the mix of the two
@@ -280,6 +304,10 @@ class Core:
             self.temperature = temperature
         if read_noise_ref_m is not None:
             self.read_noise_ref_m = read_noise_ref_m
+        if read_noise_ref_pw is not None:
+            self.read_noise_ref_pw = read_noise_ref_pw
+        if flicker_decades is not None:
+            self.flicker_decades = flicker_decades
         self._recompute_noise_coeffs()
 
     # ----- debug / visualization -----

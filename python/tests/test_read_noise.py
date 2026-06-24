@@ -59,12 +59,16 @@ def test_disabled_returns_clean_read_and_draws_nothing():
     assert core.lane(0).evaluate(Z, "FF") == 0.0
 
 
-def test_noise_does_not_touch_state():
-    # Invariant: the devices are driven by the clean read, so the conductance trace is
-    # identical whether read noise is on or off (only the returned y differs).
+def test_noisy_read_drives_the_back_action():
+    # Invariant: one junction node, one noisy Vy — the same hiss that lands on the reported read
+    # also drives a full-voltage read's back-action. So with noise on, the conductance trace
+    # diverges from the noise-off run (same seed); with read_noise=0 it is deterministic.
     noisy = _gab_trace(Core(1, 1, model="float", init="medium", seed=1), 200)
     clean = _gab_trace(Core(1, 1, model="float", init="medium", seed=1, read_noise=0), 200)
-    assert noisy == clean
+    assert noisy != clean
+    # read_noise=0 is still bit-for-bit reproducible run to run.
+    again = _gab_trace(Core(1, 1, model="float", init="medium", seed=1, read_noise=0), 200)
+    assert clean == again
 
 
 def test_low_voltage_read_is_non_disturbing_even_with_noise():
