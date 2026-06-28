@@ -17,6 +17,9 @@ examples/
   kt-bit/                # companion to "Chapter 3b: The kT-bit Up Close"
     kt_bit.ipynb
     figures.py
+  ahah-attractors/       # companion to "Chapter 5: AHaH Attractors"
+    ahah_attractors.ipynb
+    figures.py
   instructions/
     compare_instructions.ipynb
   device-physics/
@@ -46,3 +49,4 @@ keep lesson-specific code in the lesson folder.
 | Lesson | Notebook |
 |---|---|
 | The kT-bit | [Open in Colab](https://colab.research.google.com/github/knowm/ktram-neural-core/blob/main/python/examples/kt-bit/kt_bit.ipynb) |
+| AHaH Attractors | [Open in Colab](https://colab.research.google.com/github/knowm/ktram-neural-core/blob/main/python/examples/ahah-attractors/ahah_attractors.ipynb) |
