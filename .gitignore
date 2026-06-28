@@ -16,6 +16,13 @@ dist/
 # Generated example figures (any lesson's local figures/ output dir)
 figures/
 
+# Benchmark data is never committed — load it via sklearn loaders / fetch_* at runtime
+# (sklearn caches downloads under ~/scikit_learn_data, outside the repo). See docs/running.md.
+data/
+*.csv
+*.npy
+*.npz
+
 # OS / editor
 .DS_Store
 .idea/

@@ -4,8 +4,8 @@ Each figure overlays the emulator's MEASURED output on the THEORETICAL law it sh
 so the figure is also a test: matching dots-on-a-line means the emulator reproduces the
 Chapter 3b/4 physics. The emphasis is the read noise — the kT — measured against its law.
 
-Default output_dir is the 4b article folder in the website repo, so re-running updates the
-images the article embeds. Run:  python examples/neural-lane-emulator/figures.py
+Default output_dir is this lesson's own figures/ (gitignored); pass a path to write elsewhere,
+e.g. the 4b website article folder. Run:  python examples/neural-lane-emulator/figures.py
 """
 
 import sys
@@ -23,8 +23,9 @@ from _common.experiments import (                    # noqa: E402
     single_synapse_core, execute_n, Z,
 )
 
-DEFAULT_OUT = ("/Users/alexnugent/Companies/Knowm/Code/GIT/knowm-ai-website/"
-               "src/content/blog/the-neural-lane-emulator")
+# own figures/ by default; pass the article path to write into the website blog folder
+# (…/src/content/blog/the-neural-lane-emulator)
+DEFAULT_OUT = str(pathlib.Path(__file__).resolve().parent / "figures")
 
 GRID = "0.92"
 

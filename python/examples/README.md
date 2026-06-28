@@ -17,8 +17,14 @@ examples/
   kt-bit/                # companion to "Chapter 3b: The kT-bit Up Close"
     kt_bit.ipynb
     figures.py
+  neural-lane-emulator/  # companion to "Chapter 4b: The Neural Lane Emulator"
+    figures.py
   ahah-attractors/       # companion to "Chapter 5: AHaH Attractors"
     ahah_attractors.ipynb
+    figures.py
+  iris-classifier/       # benchmark — encoders + linear classifier on Iris
+    benchmark.py         #   text report: our lane vs reference linear models, same encoding
+    shared.py            #   shared comparison logic
     figures.py
   instructions/
     compare_instructions.ipynb
@@ -37,11 +43,12 @@ keep lesson-specific code in the lesson folder.
   locally under `jupyter lab`. They do *not* import `_common` — that keeps Colab a one-click
   open with no repo checkout.
 - **Figure scripts** import the shared helpers from `_common` and add the repo to the path
-  themselves, so no install is needed:
+  themselves, so no install is needed. Each defaults to **its own `figures/` subdir**
+  (gitignored); pass a path to write elsewhere (e.g. a website article folder):
 
   ```bash
-  python examples/single-synapse/figures.py        # writes ./figures/ (gitignored)
-  python examples/kt-bit/figures.py                # writes straight into the website article folder
+  python examples/single-synapse/figures.py             # writes examples/single-synapse/figures/
+  python examples/kt-bit/figures.py /path/to/article    # writes into that folder instead
   ```
 
 ## Colab

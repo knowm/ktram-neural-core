@@ -2,6 +2,7 @@
 
 Run:  python examples/single-synapse/figures.py [output_dir]
 
+Default output_dir is this lesson's own figures/ (gitignored); pass a path to write elsewhere.
 Emits the pulse up/down plots (Byte/Medium, Float/Medium) plus one MSS and one RS figure,
 so they can be eyeballed against 04_Synapse_REVIEW/_img/. No install required.
 """
@@ -52,5 +53,5 @@ def main(out_dir):
 
 
 if __name__ == "__main__":
-    out_dir = sys.argv[1] if len(sys.argv) > 1 else "figures"
-    main(out_dir)
+    default_out = str(pathlib.Path(__file__).resolve().parent / "figures")
+    main(sys.argv[1] if len(sys.argv) > 1 else default_out)

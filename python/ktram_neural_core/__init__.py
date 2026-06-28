@@ -4,6 +4,7 @@ Object model (hardware-native): Core -> NeuralLane -> UnitCrossbarPair (differen
 UnitCrossbar -> Device. Addressed only by Activation Address Tuples (AATs).
 """
 
+from .classify import LinearClassifier
 from .core import (
     NOISE_FLICKER,
     NOISE_THERMAL,
@@ -11,6 +12,7 @@ from .core import (
     ROOM_TEMPERATURE_K,
     Core,
 )
+from .encode import A2DEncoder, AATEncoder, ConstantEncoder, compose
 from .instructions import INSTRUCTIONS, Instruction
 from .lane import NeuralLane
 from .models import (
@@ -23,6 +25,7 @@ from .models import (
     RSDevice,
 )
 from .neuron import Neuron
+from .recode import AATRecoder, AboveZero, Winner, WinnerAboveZero
 from .topology import TwoOne
 from .unit_crossbar import UnitCrossbar, UnitCrossbarPair
 
@@ -48,4 +51,16 @@ __all__ = [
     "MSSDevice",
     "MSSProfile",
     "RSDevice",
+    # encode/ — data -> AAT
+    "AATEncoder",
+    "A2DEncoder",
+    "ConstantEncoder",
+    "compose",
+    # recode/ — lane-y vector -> AAT
+    "AATRecoder",
+    "Winner",
+    "AboveZero",
+    "WinnerAboveZero",
+    # classify/ — one lane per label
+    "LinearClassifier",
 ]

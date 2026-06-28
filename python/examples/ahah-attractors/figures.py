@@ -2,8 +2,8 @@
 
 Run:  python examples/ahah-attractors/figures.py [output_dir]
 
-Default output_dir is the article folder in the website repo, so re-running updates the
-prose's images in one step. Everything here runs on the same emulator the companion
+Default output_dir is this lesson's own figures/ (gitignored); pass a path to write elsewhere,
+e.g. the website article folder. Everything here runs on the same emulator the companion
 notebook uses; the data plots are reproduced exactly (fixed seeds). A 2-synapse AHaH node
 is a lane with TWO address spaces (one differential pair per space): the AAT selects which
 synapses are coupled to the shared 2-1 readout. z = (0, None) lights synapse 0 alone,
@@ -26,8 +26,9 @@ from matplotlib.lines import Line2D                   # noqa: E402
 
 from ktram_neural_core import Core                   # noqa: E402
 
-DEFAULT_OUT = ("/Users/alexnugent/Companies/Knowm/Code/GIT/knowm-ai-website/"
-               "src/content/blog/ahah-attractors")
+# own figures/ by default; pass the article path to write into the website blog folder
+# (…/src/content/blog/ahah-attractors)
+DEFAULT_OUT = str(pathlib.Path(__file__).resolve().parent / "figures")
 
 BLUE, ORANGE, GREEN, RED, GREY = "tab:blue", "tab:orange", "tab:green", "tab:red", "0.55"
 GRID = "0.92"

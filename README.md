@@ -57,30 +57,25 @@ The four device models — `float`, `byte`, `mss`, `rs` — are all available. D
 and pulse width are model-aware Core defaults and fully settable
 (`set_voltages(...)`, `set_pulse_width(dt)`).
 
-## Examples — the single-synapse lesson
+## Examples & benchmarks
 
-Reproduces the canonical Knowm Synapse lesson on the new architecture. See
-[`python/examples/`](python/examples):
-
-- `synapse_review.ipynb` — Colab-ready notebook reproducing the lesson per device type.
-- `compare_instructions.ipynb` — runs the **same instruction sequence across all four
-  types** (pulse, FF-RH/RL, FF-RU/RA, FF-RZ, FF-XX/RF-XX, low-voltage), overlaying the
-  normalized `y` from matched initial conditions.
-- `iv_hysteresis.ipynb` — drives MSS/RS devices with a sinusoidal sweep and plots the
-  pinched I-V hysteresis loop vs frequency; the device-physics parameters are the handles
-  for fitting the model to measured devices.
-- `generate_figures.py` — writes the headline PNGs (Byte/Float pulse, RS, MSS RNG).
-- `synapse_experiments.py` — the experiment matrix as reusable functions.
+Runnable lessons — each a `figures.py` plus, for most, a Colab-ready notebook — and the
+classifier benchmarks live under [`python/examples/`](python/examples); see its
+[README](python/examples/README.md) for the catalog and Colab links.
 
 ```bash
 cd python && pip install -e ".[examples,dev]"
-python examples/generate_figures.py     # -> python/examples/figures/*.png
-pytest                                    # 26 unit + behavioral tests
+python examples/single-synapse/figures.py     # writes examples/single-synapse/figures/ (gitignored)
+python examples/iris-classifier/benchmark.py   # a classifier benchmark report
+pytest                                          # the unit + behavioral suite
 ```
 
-Byte pulse-up/down plateaus at ±0.5 (the quantization ceiling); Float sweeps to ±1; FF is
-anti-Hebbian and RF is Hebbian; the MSS RNG demo digitizes to a fair bit. Final validation
-against the lesson figures is by eye.
+Each `figures.py` defaults to its own `figures/` subdir; pass a path to write elsewhere.
+
+## Documentation
+
+Full docs are in [`docs/`](docs/) — the [object model and instruction set](docs/architecture.md),
+[how to run everything](docs/running.md), and the [repo layout & conventions](docs/repo-structure.md).
 
 ## License
 

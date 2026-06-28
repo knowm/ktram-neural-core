@@ -2,8 +2,8 @@
 
 Run:  python examples/kt-bit/figures.py [output_dir]
 
-Default output_dir is the article folder in the website repo, so re-running updates the
-prose's images in one step. Imports the shared single-synapse helpers, so the article and
+Default output_dir is this lesson's own figures/ (gitignored); pass a path to write elsewhere,
+e.g. the website article folder. Imports the shared single-synapse helpers, so the article and
 the notebook can never drift from the code. The data plots are reproduced exactly (fixed
 seeds); the two conceptual diagrams (2-1 vs 1-2, "two numbers") are schematic and meant as
 drafts a designer can redraw in the chapter's hand-drawn style.
@@ -22,8 +22,9 @@ from matplotlib.patches import Rectangle, FancyArrowPatch
 from _common import experiments as ex
 
 BLUE, GREEN, ORANGE, GREY = "tab:blue", "tab:green", "tab:orange", "0.55"
-DEFAULT_OUT = ("/Users/alexnugent/Companies/Knowm/Code/GIT/knowm-ai-website/"
-               "src/content/blog/thermodynamic-bit-up-close")
+# own figures/ by default; pass the article path to write into the website blog folder
+# (…/src/content/blog/thermodynamic-bit-up-close)
+DEFAULT_OUT = str(pathlib.Path(__file__).resolve().parent / "figures")
 
 
 def w_of(gas, gbs):

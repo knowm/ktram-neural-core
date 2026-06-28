@@ -13,7 +13,7 @@ authors = [{ name = "Knowm Inc." }]
 dependencies = ["numpy>=1.22"]
 
 [project.optional-dependencies]
-examples = ["matplotlib>=3.5"]
+examples = ["matplotlib>=3.5", "scikit-learn>=1.0"]
 dev = ["pytest>=7"]
 
 [tool.setuptools.packages.find]
