@@ -22,10 +22,13 @@ examples/
   ahah-attractors/       # companion to "Chapter 5: AHaH Attractors"
     ahah_attractors.ipynb
     figures.py
+  a2d-encoder/           # one-off illustration of the A2D adaptive binning
+    animation.py         #   GIF of bins finding a clumpy distribution (higher bit depth)
   iris-classifier/       # benchmark — encoders + linear classifier on Iris
     benchmark.py         #   text report: our lane vs reference linear models, same encoding
     shared.py            #   shared comparison logic
-    figures.py
+    figures.py           #   blog figures (accuracy, confusion, adaptive-bin scatter)
+    animation.py         #   GIF of the A2D bins adapting to the data
   instructions/
     compare_instructions.ipynb
   device-physics/
