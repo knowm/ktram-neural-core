@@ -36,10 +36,10 @@ LRATE = 0.005          # A2D bin-migration rate (encode_adapt EMA); smaller = sm
 N = 4000               # synthetic points — enough that the deep, rarely-hit bins still converge
 EPOCHS = 6             # passes over the data
 SEED = 0
-SNAPSHOT_EVERY = 150   # integrate many updates per frame -> smooth (~160 frames total)
-FPS = 20
-HOLD_START = 8
-HOLD_END = 28
+SNAPSHOT_EVERY = 360   # integrate many updates per frame -> smooth (~65 frames total)
+FPS = 15
+HOLD_START = 6
+HOLD_END = 14
 PLOT_N = 1200          # scatter a subsample so the cloud stays readable at high N
 EDGE_COLOR = "0.5"
 DOT_COLOR = "tab:blue"
@@ -113,7 +113,7 @@ def main(out_dir):
     X = make_data(N, SEED)
     lo, hi, frames, total = collect_frames(X)
 
-    fig, ax = plt.subplots(figsize=(6.5, 6.2), dpi=90)
+    fig, ax = plt.subplots(figsize=(6.5, 6.2), dpi=64)
     ax.set_xlim(lo[0], hi[0])
     ax.set_ylim(lo[1], hi[1])
     ax.scatter(X[:PLOT_N, 0], X[:PLOT_N, 1], s=9, color=DOT_COLOR, alpha=0.18,

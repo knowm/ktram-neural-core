@@ -29,6 +29,8 @@ examples/
     shared.py            #   shared comparison logic
     figures.py           #   blog figures (accuracy, confusion, adaptive-bin scatter)
     animation.py         #   GIF of the A2D bins adapting to the data
+  rank-cut-recoder/      # companion to the RankCut AAT Recoder chapter
+    demo.py              #   the L1 recoder end to end: encode -> adapt -> read, (Vt, N)
   instructions/
     compare_instructions.ipynb
   device-physics/

@@ -11,9 +11,11 @@ Three figures:
                          a linear classifier's accuracy (raw vs encoded); the kT-RAM lane is as
                          good as the reference linear models on the same encoding.
   2. confusion.png     — the kT-RAM lane vs the reference LogReg, same encoded AATs, side by side.
-  3. encoding.png      — Iris in petal space with the adapted A2D bin grid; the equal-occupancy
-                         bins put resolution where the classes crowd, and the residual errors
-                         sit on the versicolor/virginica overlap a linear rule cannot split.
+  3. encoding.png      — three 2D projections of the same four-dimensional Iris data. The lane
+                         classifies in all four dimensions at once; any single view flattens that.
+                         Setosa separates in every view; versicolor and virginica stay tangled in
+                         all of them, and the lane's few misses sit in that overlap a line cannot
+                         split — the baseline the reference linear solvers hit too.
 """
 
 import sys
@@ -104,47 +106,42 @@ def fig_confusion(ax=None):
     return ax
 
 
-# ----------------------------------------------------------------- 3. the encoding picture
+# ----------------------------------------------------------------- 3. the dimensionality picture
 
-# Iris feature columns: 0 sepal len, 1 sepal wid, 2 petal len, 3 petal wid. Petals separate best.
-PX, PY = 2, 3
+# Iris feature columns: 0 sepal len, 1 sepal wid, 2 petal len, 3 petal wid.
+# Three 2D projections of the same 4D data. The lane reads all four dimensions at once; any one
+# view flattens that. Petals separate best; sepals barely; the cross view sits between.
+PROJECTIONS = [(2, 3), (0, 1), (2, 0)]
+ENC_SEED = 5   # a split with a couple of misses, so the overlap point is visible (SEED 0 is perfect)
 
 
-def fig_encoding(ax=None):
-    own = ax is None
+def fig_encoding(axes=None):
+    own = axes is None
     if own:
-        _, ax = plt.subplots(figsize=(7.5, 6.4))
-    r = shared.run_once(SEED)
-    enc, data = r["encoder"], r["data"]
+        _, axes = plt.subplots(1, 3, figsize=(13.5, 4.5))
+    r = shared.run_once(ENC_SEED)
+    data = r["data"]
     X_all = np.vstack([r["X_tr"], r["X_te"]])
     y_all = np.concatenate([r["y_tr"], r["y_te"]])
-    lo = X_all.min(0)
-    hi = X_all.max(0)
+    wrong = r["preds"][shared.OURS] != r["y_te"]   # the lane's misses, shown in every view
 
-    # adapted bin grid for the two petal dimensions
-    for e in shared.bin_edges(enc, PX, lo[PX], hi[PX]):
-        ax.axvline(e, color="0.85", lw=0.8, zorder=1)
-    for e in shared.bin_edges(enc, PY, lo[PY], hi[PY]):
-        ax.axhline(e, color="0.85", lw=0.8, zorder=1)
+    for ax, (px, py) in zip(axes, PROJECTIONS):
+        for c in range(len(data.target_names)):
+            m = y_all == c
+            ax.scatter(X_all[m, px], X_all[m, py], s=16, color=CLASS_COLORS[c],
+                       label=data.target_names[c], alpha=0.8, zorder=2, edgecolor="none")
+        ax.scatter(r["X_te"][wrong, px], r["X_te"][wrong, py], s=130, facecolor="none",
+                   edgecolor="k", lw=1.5, zorder=3, label="lane missed")
+        ax.set_xlabel(data.feature_names[px], fontsize=9)
+        ax.set_ylabel(data.feature_names[py], fontsize=9)
+        ax.grid(False)
 
-    # all points, colored by true class
-    for c in range(len(data.target_names)):
-        m = y_all == c
-        ax.scatter(X_all[m, PX], X_all[m, PY], s=18, color=CLASS_COLORS[c],
-                   label=data.target_names[c], alpha=0.8, zorder=2, edgecolor="none")
-
-    # circle the test points our lane got wrong — they sit on the v/v overlap
-    wrong = r["preds"][shared.OURS] != r["y_te"]
-    ax.scatter(r["X_te"][wrong, PX], r["X_te"][wrong, PY], s=140, facecolor="none",
-               edgecolor="k", lw=1.6, zorder=3, label="lane misclassified")
-
-    ax.set_xlabel(data.feature_names[PX])
-    ax.set_ylabel(data.feature_names[PY])
-    ax.set_title("Adaptive A2D bins concentrate resolution where the classes crowd\n"
-                 "(residual errors lie on the versicolor/virginica overlap)", fontsize=10.5)
-    ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
-    ax.grid(False)
-    return ax
+    axes[0].legend(loc="best", fontsize=8, framealpha=0.9)
+    plt.gcf().suptitle(
+        "Three 2D views of the same four-dimensional Iris — the lane classifies in all four at "
+        "once.\nSetosa separates everywhere; versicolor and virginica stay tangled in every "
+        "view, and that overlap is the baseline a straight cut cannot beat.", fontsize=10.5)
+    return axes
 
 
 # ------------------------------------------------------------------------------------ main

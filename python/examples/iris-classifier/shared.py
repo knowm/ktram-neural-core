@@ -57,6 +57,10 @@ def load_split(seed):
 
 def build_encoder(X_tr):
     """A2D over the four features (+ a bias space), seeded from the training-split ranges."""
+    # return compose(
+    #     A2DEncoder(dims=4, bits=BITS, init_min=X_tr.min(0), init_max=X_tr.max(0), l=LRATE),
+    #     ConstantEncoder(),
+    # )
     return compose(
         A2DEncoder(dims=4, bits=BITS, init_min=X_tr.min(0), init_max=X_tr.max(0), l=LRATE),
         ConstantEncoder(),

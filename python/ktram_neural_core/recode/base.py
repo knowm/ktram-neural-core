@@ -1,12 +1,16 @@
-"""AATRecoder — lane-`y` vector -> AAT in the output space.
+"""RecodePolicy — a pure, memory-less readout rule: lane-`y` vector -> output-space AAT.
 
-The Ch4 "AAT Recoder / A2D" in code: an analog vector in (one `y` per label-lane), an AAT out
-(one channel per label/lane) — exactly what a downstream lane would consume if lanes are ever
-layered. Recoders are pure functions over the read vector, no device state.
+One `y` per label-lane in, one AAT out (one channel per label/lane) — what a downstream lane
+consumes if lanes are layered. A RecodePolicy holds no device state; it is only the `y -> AAT`
+rule (Winner, AboveZero, WinnerAboveZero).
+
+NOTE — do not confuse this with the `AATRecoder` construct in `aat_recoder/`. That one is a
+hardware-level structure that *drives* neural lanes and executes kT-RAM instructions; this is just
+the pure output rule applied to a read vector (by an L1 recoder, or by the LinearClassifier).
 """
 
 
-class AATRecoder:
+class RecodePolicy:
     def recode(self, y_vector):
         """Return the output-space AAT for a vector of lane `y` values."""
         raise NotImplementedError

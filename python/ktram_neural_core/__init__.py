@@ -4,6 +4,7 @@ Object model (hardware-native): Core -> NeuralLane -> UnitCrossbarPair (differen
 UnitCrossbar -> Device. Addressed only by Activation Address Tuples (AATs).
 """
 
+from .aat_recoder import AATRecoder, RankCut, rank_cut
 from .classify import LinearClassifier
 from .core import (
     NOISE_FLICKER,
@@ -25,7 +26,7 @@ from .models import (
     RSDevice,
 )
 from .neuron import Neuron
-from .recode import AATRecoder, AboveZero, Winner, WinnerAboveZero
+from .recode import AboveZero, RecodePolicy, Winner, WinnerAboveZero
 from .topology import TwoOne
 from .unit_crossbar import UnitCrossbar, UnitCrossbarPair
 
@@ -56,11 +57,15 @@ __all__ = [
     "A2DEncoder",
     "ConstantEncoder",
     "compose",
-    # recode/ — lane-y vector -> AAT
-    "AATRecoder",
+    # recode/ — lane-y vector -> AAT (pure recode policies)
+    "RecodePolicy",
     "Winner",
     "AboveZero",
     "WinnerAboveZero",
+    # aat_recoder/ — the lane-driving construct + L1 recoders
+    "AATRecoder",
+    "RankCut",
+    "rank_cut",
     # classify/ — one lane per label
     "LinearClassifier",
 ]
