@@ -83,6 +83,7 @@ class Core:
         forward_low_voltage=None,
         reverse_low_voltage=None,
         pulse_width=None,
+        read_pulse_width=None,
         read_noise=READ_NOISE,
         noise_thermal=NOISE_THERMAL,
         noise_flicker=NOISE_FLICKER,
@@ -150,8 +151,24 @@ class Core:
         self.read_noise_ref_pw = (
             read_noise_ref_pw if read_noise_ref_pw is not None else self.pulse_width
         )
+        # Read and update pulse widths are decoupled. read_sample keys its bandwidth off
+        # read_pulse_width; the drive/update step (NeuralLane.evaluate) keys off pulse_width. They
+        # default equal, so a Core built without read_pulse_width reads exactly as before — the
+        # separation only matters when a short SAMPLING read must not shrink the write step (see the
+        # thermal-reflection line). A shorter read_pulse_width lifts the thermal term as
+        # sqrt(read_noise_ref_pw / read_pulse_width) at a normal read voltage.
+        self.read_pulse_width = (
+            self.pulse_width if read_pulse_width is None else read_pulse_width
+        )
         self.flicker_decades = flicker_decades
         self._recompute_noise_coeffs()
+
+    def __setstate__(self, state):
+        # Back-fill attributes added after older pickles were written (snapshots are reused across
+        # runs). read_pulse_width defaults to the update pulse, which is exactly how a pre-split Core
+        # read, so an old snapshot deserializes to identical behavior.
+        state.setdefault("read_pulse_width", state.get("pulse_width"))
+        self.__dict__.update(state)
 
     # ----- construction -----
 
@@ -250,10 +267,11 @@ class Core:
         if self.read_noise <= 0.0 or m <= 0.0:
             return y_clean
         f_m = self._sqrt_ref_m / math.sqrt(m)
-        # Read bandwidth from the pulse width: white (thermal) power ~ Df ~ 1/pw -> sigma ~ 1/sqrt(pw);
-        # 1/f (flicker) power ~ ln(band), and the pulse only moves the band's upper edge.
-        bw_thermal = math.sqrt(self.read_noise_ref_pw / self.pulse_width)
-        ln_band = self._flicker_ln_ref + math.log(self.read_noise_ref_pw / self.pulse_width)
+        # Read bandwidth from the READ pulse width (decoupled from the update pulse): white (thermal)
+        # power ~ Df ~ 1/pw -> sigma ~ 1/sqrt(pw); 1/f (flicker) power ~ ln(band), and the pulse only
+        # moves the band's upper edge.
+        bw_thermal = math.sqrt(self.read_noise_ref_pw / self.read_pulse_width)
+        ln_band = self._flicker_ln_ref + math.log(self.read_noise_ref_pw / self.read_pulse_width)
         bw_flicker = math.sqrt(ln_band / self._flicker_ln_ref) if ln_band > 0.0 else 0.0
         sigma_thermal = self._a_thermal * f_m / abs(v_app) * bw_thermal
         sigma_flicker = self._a_flicker * (1.0 - y_clean * y_clean) * f_m * bw_flicker
@@ -280,7 +298,15 @@ class Core:
             self.reverse_low_voltage = reverse_low_voltage
 
     def set_pulse_width(self, dt):
+        """Set the UPDATE pulse width (the conductance step's dt). Leaves read_pulse_width alone, so
+        the read-noise bandwidth is unchanged — set that with set_read_pulse_width."""
         self.pulse_width = dt
+
+    def set_read_pulse_width(self, dt):
+        """Set the READ pulse width — the read-noise bandwidth dial (read_sample), independent of the
+        update pulse. A shorter read pulse lifts the thermal term as sqrt(read_noise_ref_pw/dt) at a
+        normal read voltage; the write step (pulse_width) is untouched."""
+        self.read_pulse_width = dt
 
     def set_read_noise(self, read_noise=None, noise_thermal=None, noise_flicker=None,
                        temperature=None, read_noise_ref_m=None, read_noise_ref_pw=None,

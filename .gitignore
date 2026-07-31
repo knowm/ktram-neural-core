@@ -1,5 +1,7 @@
-# Private planning / spec — do NOT publish to the public repo
+# Private planning
 planning/
+# in-progress
+drafts/
 
 # Python
 __pycache__/
@@ -23,7 +25,11 @@ data/
 *.npy
 *.npz
 
+# Generated congruence reports (the battery re-emits them every run)
+python/tests/congruence_report.md
+
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
+.obsidian/

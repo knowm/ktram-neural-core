@@ -157,3 +157,52 @@ def test_set_read_noise_runtime_toggle():
     core.set_read_noise(read_noise=READ_NOISE)
     # with noise back on a balanced pair no longer reads exactly zero
     assert core.lane(0).evaluate(Z, "FF") != 0.0
+
+
+def test_read_pulse_width_defaults_to_update_pulse():
+    # Decoupled read/update pulse widths default equal, across every model, so a Core built without
+    # read_pulse_width reads exactly as before.
+    for model in ("float", "byte", "rs", "mss"):
+        core = Core(1, 1, model=model)
+        assert core.read_pulse_width == core.pulse_width
+
+
+def test_default_read_pulse_reproduces_the_shipped_read():
+    # The guard: read_pulse_width == pulse_width (the default) leaves the read path bit-for-bit
+    # identical to explicitly pinning the read pulse to the update pulse.
+    def run(**kw):
+        core = Core(1, 1, model="float", init="medium", seed=1, **kw)
+        return [core.lane(0).evaluate(Z, "FFLV") for _ in range(80)]
+
+    assert run() == run(read_pulse_width=Core(1, 1, model="float").pulse_width)
+
+
+def test_read_pulse_width_is_the_thermal_bandwidth_dial():
+    # A shorter READ pulse lifts thermal read noise (~1/sqrt(pw)) at a normal read voltage, and the
+    # state still does not move. This is the pulse-width dial the thermal-reflection line samples on.
+    import numpy as np
+
+    def sigma(read_pw):
+        core = Core(1, 1, model="float", init="medium", seed=1,
+                    noise_thermal=1.0, noise_flicker=0.0)
+        core.set_start_y(0, Z, 0.0, 0.5)                 # m = GMax, w = 0
+        core.set_read_pulse_width(read_pw)
+        lane = core.lane(0)
+        before = core.read_gab(0, Z)
+        ys = [lane.evaluate(Z, "FFLV") for _ in range(4000)]
+        assert core.read_gab(0, Z) == before             # a hotter read still does not disturb
+        return float(np.std(ys))
+
+    ref = Core(1, 1, model="float").pulse_width          # read_noise_ref_pw anchor
+    assert sigma(ref / 100) > 5 * sigma(ref)             # 100x shorter -> ~10x thermal
+
+
+def test_read_and_update_pulse_widths_are_independent():
+    # The read dial and the update dial move only their own pulse width.
+    core = Core(1, 1, model="byte")
+    pw0 = core.pulse_width
+    core.set_read_pulse_width(pw0 / 1000)
+    assert core.pulse_width == pw0                        # read dial leaves the update pulse alone
+    rpw = core.read_pulse_width
+    core.set_pulse_width(pw0 / 7)
+    assert core.read_pulse_width == rpw                   # update dial leaves the read bandwidth alone
