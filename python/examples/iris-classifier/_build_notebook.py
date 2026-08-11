@@ -20,29 +20,31 @@ md = nbf.v4.new_markdown_cell
 code = nbf.v4.new_code_cell
 cells = []
 
-cells.append(md(r"""# The Iris classifier — the supervised lesson
+cells.append(md(r"""# The Iris classifier
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/knowm/ktram-neural-core/blob/main/python/examples/iris-classifier/iris_classifier.ipynb)
 
-The runnable companion to *Chapter 6: Classification and Thermal Sampling on kT-RAM Neural
+This notebook runs alongside *Chapter 6: Classification and Thermal Sampling on kT-RAM Neural
 Lanes*. Three **neural lanes**, one per iris species, learn to name flowers from a supervised
-routine written in kT-RAM instructions: read each lane with `FF`, drive the right one up with
-`RH`, drive the wrong-but-fired ones down with `RL`, leave the rest alone with `RF`. We build
-the AAT encoding first (fixed bins, adaptive bins, a bias), train at L0 by hand, wrap the same
-routine as the `RankCut` L1 recoder, and benchmark it against batch linear solvers on the
-identical encoding.
+routine written in kT-RAM instructions. Read each lane with `FF`. Drive the right one up with
+`RH`, drive the wrong-but-fired ones down with `RL`, and leave the rest alone with `RF`.
 
-Then we do what the chapter does at the end: turn the read noise back on and watch verdicts
-become samples, then teach fresh banks the opposite mapping — label in, pattern out — and
-sample a tilted two-dimensional cloud through the two-step chain, breaking the correlation on
-purpose by reading the banks synchronously.
+We build the AAT encoding first, with fixed bins, adaptive bins, and a bias. Then we train at
+L0 by hand, wrap the same routine as the `RankCut` L1 recoder, and measure it against batch
+linear solvers on the identical encoding.
 
-The seeds and knobs are there to be changed: `bits`, `model`, `init`, the epochs, the
+The last third of the notebook turns the read noise back on. Verdicts become samples. Fresh
+banks then learn the opposite mapping, label in and pattern out, and sample a tilted
+two-dimensional cloud through a two-step chain. Reading the banks synchronously breaks the
+correlation, which shows what the chain carried.
+
+Change the seeds and the knobs as you go: `bits`, `model`, `init`, the epochs, the
 temperatures, and the feedback rule."""))
 
 cells.append(md("""## Setup
 
-On Colab this installs the package from GitHub. Locally it is a no-op if already installed."""))
+On Colab this installs the package from GitHub. Locally it does nothing if the package is
+already installed."""))
 
 cells.append(code('''try:
     import ktram_neural_core  # noqa: F401
@@ -76,8 +78,8 @@ cells.append(md("""## The data
 Iris is a small table the statistician Ronald Fisher published in 1936: a hundred and fifty
 flowers, fifty from each of three species, and four measurements per flower in centimeters.
 The species is the label. Setosa (blue) sits in its own clump in every view. Versicolor (green)
-and virginica (red) overlap, worst in the sepals — that overlap is where every classifier's
-errors will land, ours included."""))
+and virginica (red) overlap, worst in the sepals. Every classifier puts its errors in that
+overlap, ours included."""))
 
 cells.append(code('''fig, axes = plt.subplots(1, 2, figsize=(11, 4.6))
 for ax, (i, j) in zip(axes, [(2, 3), (0, 1)]):
@@ -92,7 +94,7 @@ plt.tight_layout(); plt.show()'''))
 cells.append(md("""## Encoding the measurements as AATs
 
 A lane does not read numbers. It reads AATs, so every flower has to become a tuple of channel
-indices before a lane sees it. The `A2DEncoder` does the analog-to-digital move: each feature
+indices before a lane sees it. The `A2DEncoder` does the analog-to-digital move. Each feature
 gets its own space of bins, and a value's channel is whichever bin it lands in. `bits=3` cuts
 each feature's range into eight bins, so a flower encodes to a four-entry AAT."""))
 
@@ -104,12 +106,12 @@ print("space sizes:", fixed.space_sizes)'''))
 
 cells.append(md("""## Fixed bins against adaptive bins
 
-Left unadapted, the encoder keeps an even slicing of each feature's range. Let it adapt —
-`encode_adapt` on each training example — and every value tugs the nearest bin edges a little
-in its direction, so the edges migrate until every bin holds about the same number of points.
-The resolution goes where the data is.
+Left unadapted, the encoder keeps an even slicing of each feature's range. Call `encode_adapt`
+on each training example instead, and every value tugs the nearest bin edges a little in its
+direction. The edges migrate until every bin holds about the same number of points, so the
+resolution goes where the data is.
 
-The encoder gives no direct view of its edges, so we read them the black-box way: sweep a value
+The encoder gives no direct view of its edges. We read them from the outside: sweep a value
 through one dimension and record where the reported bin index changes."""))
 
 cells.append(code('''def bin_edges(encoder, dim, lo, hi, n=4000):
@@ -147,11 +149,11 @@ plt.tight_layout(); plt.show()'''))
 
 cells.append(md("""## Adding the bias
 
-A bias is just an always-on input. The `ConstantEncoder` ignores the value and always lights
-the same channel, and `compose` lays its AAT after the A2D's. Five spaces now: four adaptive
-bins, then the bias. The balanced A2D encoding does not strictly need the bias on this data,
-but one extra synapse costs little and shows the mechanism. This composed encoder is what the
-lanes see for the rest of the notebook."""))
+A bias is an always-on input. The `ConstantEncoder` ignores the value and always lights the
+same channel, and `compose` lays its AAT after the A2D's. That gives five spaces: four
+adaptive bins, then the bias. The balanced A2D encoding does not need the bias on this data,
+but one extra synapse costs little and shows the mechanism. The lanes see this composed
+encoder for the rest of the notebook."""))
 
 cells.append(code('''encoder = compose(
     A2DEncoder(dims=4, bits=3, init_min=X_tr.min(0), init_max=X_tr.max(0), l=0.01),
@@ -162,21 +164,21 @@ print("space sizes:", encoder.space_sizes)'''))
 
 cells.append(md("""## The supervised rule, driven at L0
 
-Provision a core with three lanes, one per species, five spaces each — the byte model, so every
-synapse is an 8-bit memristor. Read noise is off for training, so a fixed seed reproduces
-exactly (real hardware does not offer that switch).
+Provision a core with three lanes, one per species, and five spaces each. The byte model makes
+every synapse an 8-bit memristor. Read noise is off for training, so a fixed seed reproduces
+exactly. Real hardware does not offer that switch.
 
-Phase one adapts the encoder's bins with the classifier off. Then the encoder is frozen — we
-never call `encode_adapt` again — because a classifier cannot learn against an encoding that
-slides out from under it. Phase two is the whole supervised rule, three cases of an `if`,
-written in raw kT-RAM instructions:
+Phase one adapts the encoder's bins with the classifier off. Then we freeze the encoder and
+never call `encode_adapt` again, because a classifier cannot learn against an encoding that
+slides out from under it. Phase two is the supervised rule, three cases of an `if`, written in
+raw kT-RAM instructions:
 
 - the lane that owns this flower's species gets `RH` — driven up toward *yes*
 - a wrong lane that fired anyway gets `RL` — a false positive, driven down
 - a wrong lane that correctly stayed below zero gets `RF` — left alone
 
-Inference reads each lane with `FFLV`, the sub-threshold read that reports without disturbing,
-and takes the winner."""))
+Inference reads each lane with `FFLV`, the sub-threshold read that reports the weight without
+changing it, and takes the winner."""))
 
 cells.append(code('''LABELS = [0, 1, 2]
 core = Core(1, 8, spaces_per_lane=len(encoder.space_sizes), num_lanes=len(LABELS),
@@ -211,16 +213,17 @@ for epoch in range(5):                             # phase two: the three-case r
 
 cells.append(md("""## The same routine as an L1 recoder
 
-The loop above reaches into the lanes and handles their analog outputs as floats — fine for
-research, not something we would put in hardware. The `RankCut` recoder wraps the exact routine
-behind an AAT-level interface: `adapt` to teach, `read` to answer, analog contained inside.
-Point it at the core we just trained by hand and its reads agree with our argmax, because
-underneath it runs the same instructions.
+The loop above reaches into the lanes and handles their analog outputs as floats. That works
+for research, but we would not put it in hardware.
 
-The readout policy is the rank-cut itself: keep the lanes above a threshold `Vt`, sorted
-strongest first, and cut after at most `N`. The winner is its smallest setting. In silicon this
-sort is a swept reference voltage — the lanes surface in rank order as the waterline falls —
-and that circuit gets its own chapter."""))
+The `RankCut` recoder wraps the same routine behind an AAT-level interface, with `adapt` to
+teach, `read` to answer, and the analog kept inside. Point it at the core we just trained by
+hand. Its reads agree with our argmax, because underneath it runs the same instructions.
+
+The readout policy is the rank-cut. Keep the lanes above a threshold `Vt`, sorted strongest
+first, and cut after at most `N`. The winner is its smallest setting. In silicon a swept
+reference voltage does this sort: the lanes surface in rank order as the waterline falls. That
+circuit gets its own chapter."""))
 
 cells.append(code('''rec = RankCut(core, labels=LABELS)            # wraps the SAME core we trained above
 
@@ -241,15 +244,15 @@ print("rec.adapt ->", out, "  (one FF read + RH/RL/RF pass, then the recoded rea
 
 cells.append(md("""## Does it work?
 
-Accuracy on its own says little. The fair test freezes one encoder and runs three linear
+Accuracy on its own says little. A fair test freezes one encoder and runs three linear
 classifiers on the identical AAT encoding: our lane, scikit-learn's `LogisticRegression`, and a
-`LinearSVC`. The reference two solve for their weights in a batch over the whole dataset at
-once, while the lane learns online, one example at a time, with local instructions. A fourth
-bar, logistic regression on the raw measurements, shows what the encoding itself costs or gains.
+`LinearSVC`. The two reference models solve for their weights in one batch over the whole
+dataset. The lane learns online, one example at a time, with local instructions. A fourth bar
+runs logistic regression on the raw measurements, which shows what the encoding costs or gains.
 
-The reference models get the binary vector the lane actually reads — a one at each active
-(space, channel) position. The library's `LinearClassifier` is the same three-case loop we wrote
-by hand, packaged, so we use it here to sweep twenty train/test splits. Give this cell a minute."""))
+The reference models read the same binary vector the lane reads, with a one at each active
+(space, channel) position. The library's `LinearClassifier` packages the three-case loop we
+wrote by hand, so we use it here to sweep twenty train/test splits. Give this cell a minute."""))
 
 cells.append(code('''def aat_to_onehot(aat, sizes):
     """The binary (space, channel) vector the lane reads: one 1 per active space."""
@@ -300,9 +303,9 @@ plt.tight_layout(); plt.show()'''))
 
 cells.append(md("""## Where the misses land
 
-The lane and logistic regression miss the same flowers: the versicolor/virginica overlap that no
-straight line splits. That ceiling is a property of the data, not the learning rule, and hitting
-it is the point."""))
+The lane and logistic regression miss the same flowers, the versicolor/virginica overlap that no
+straight line splits. That ceiling comes from the data, not from the learning rule. A linear
+classifier that reaches it does everything a linear classifier can do here."""))
 
 cells.append(code('''yte, preds = run_once(0)
 for m in ['kT-RAM lane (AAT)', 'LogReg (AAT)']:
@@ -312,16 +315,19 @@ for m in ['kT-RAM lane (AAT)', 'LogReg (AAT)']:
 cells.append(md("""## Reading at temperature
 
 Everything above read cold. Real hardware carries the kT-bit's read noise on every read, and the
-dial for it is the read voltage: the `noise` argument slides the read voltage from the standard
-low-voltage read (`0`, nearly clean) toward zero volts (`1`, the hiss swallows the signal).
+read voltage is the dial for it. The `noise` argument slides the read voltage down from the
+standard low-voltage read at `0`, which is nearly clean, toward zero volts at `1`, where the
+hiss swallows the signal.
 
 Turn the master gain back on and read the same trained lanes hot, many times. The thermal part
 of the hiss grows as $1/V$, so most of the dial changes little and the action piles up near the
-bottom. At `noise=0.98` the flower on the versicolor/virginica overlap becomes a weighted draw
-between its two contending lanes while the setosa stays certain — the classifier stops issuing
-verdicts and starts drawing samples, and only where the data left the question open. Push to
-`noise=0.995` and the hiss swallows everything, the setosa included. Somewhere between a verdict
-and static sits the useful sampler."""))
+bottom.
+
+At `noise=0.98` the flower on the versicolor/virginica overlap becomes a weighted draw between
+its two contending lanes, while the setosa stays certain. The classifier now returns samples
+rather than verdicts, and only where the data left the question open. Push to `noise=0.995` and
+the hiss swallows everything, the setosa included. The useful sampler sits between those two
+settings."""))
 
 cells.append(code('''core.set_read_noise(0.02)                       # the hiss back on (0 disabled it for training)
 
@@ -359,26 +365,38 @@ cells.append(md("""## The soft generator
 
 A lane bank runs one direction only: an AAT in, an AAT out. The label is a plain tuple
 coordinate, so it can sit on either side. The classifier learned the pattern-to-label mapping,
-and that trained bank cannot be handed a label to get a pattern back — it holds one mapping, in
-one direction. A generator is a new bank of lanes taught the opposite mapping, separately, with
-the same basic supervised routine: the label enters as an input coordinate and the output lanes
-stand for pattern bins. Clamp a label, read a pattern. The data is a flat two-dimensional
-mixture — a tilted cloud with label 0 and a round cloud with label 1 — binned on both axes by
-the fixed-bin A2D idea, sixteen bins each.
+and that trained bank holds only that one direction. Hand it a label and no pattern comes back.
 
-Swap the roles: give the *bins* the lanes. An x bank holds one lane per x bin and reads only the
-label. A y bank holds one lane per y bin and reads the label together with the x bin. Teach both
-banks **soft** — drop the `RL` case, so no lane is ever punished for firing — and teach with
-slightly hot reads, so the hiss dithers the byte-quantized updates. Where the data genuinely
-spreads across many bins, soft feedback keeps every supported answer above the waterline instead
-of leaving one loud winner.
+A generator is a new bank of lanes taught the opposite mapping, separately, with the same
+supervised routine. The label enters as an input coordinate and the output lanes stand for
+pattern bins. Clamp a label, read a pattern.
 
-One tuning note. These cores get a louder master noise gain (`read_noise=0.2` instead of the
-device default `0.02`), so the hiss is comparable to the gaps between lane scores in the middle
-of the voltage dial rather than only in its last two percent. The mechanism is unchanged — the
-dial is still the read voltage — we just turned up the amplifier for the demonstration."""))
+The data is a flat two-dimensional mixture: a tilted cloud with label 0 and a round cloud with
+label 1, binned on both axes by the fixed-bin A2D idea, twenty bins each.
 
-cells.append(code('''NB = 16                       # bins per axis (and lanes per bank)
+Swap the roles and give the *bins* the lanes. An x bank holds one lane per x bin and reads only
+the label. A y bank holds one lane per y bin and reads the label together with the x bin.
+
+Teach both banks **soft**, which means dropping the `RL` case so no lane is ever punished for
+firing. Teach with slightly hot reads too, so the hiss dithers the byte-quantized updates. Where
+the data spreads across many bins, soft feedback keeps every supported answer above the
+waterline instead of leaving one loud winner.
+
+The two banks do not face the same job. The x bank reads one thing, the label, so it has two
+contexts to learn and settles quickly. The y bank reads the label *and* the committed x bin, so
+it has one conditional distribution to learn for every x bin. That is twenty times the work from
+the same stream of examples.
+
+Starve the y bank and it falls back on the y marginal, which is the tilt-free answer the
+synchronous draw gives. So this cell walks 2400 examples per class rather than a few hundred.
+The conditional is expensive, and it carries the whole correlation.
+
+One tuning note. These cores get a louder master noise gain, `read_noise=0.2` instead of the
+device default `0.02`. The hiss then matches the gaps between lane scores in the middle of the
+voltage dial rather than only in its last two percent. The mechanism does not change. The dial
+is still the read voltage, turned up here for the demonstration."""))
+
+cells.append(code('''NB = 20                       # bins per axis (and lanes per bank)
 TEACH_T = 0.25                # slightly hot teach reads — the dither
 rng = np.random.default_rng(0)
 
@@ -392,7 +410,7 @@ def make_data(n_per):
         pts.append((0.78 + dx, 0.24 + dy)); labs.append(1)
     return np.clip(np.array(pts), 0.001, 0.999), np.array(labs)
 
-train_pts, train_labs = make_data(600)
+train_pts, train_labs = make_data(2400)
 bin_of = lambda v: min(NB - 1, int(v * NB))
 
 # read noise ON and louder than the device default — the dither and the sampling both use it
@@ -417,20 +435,24 @@ print("taught", len(train_pts), "examples soft")'''))
 
 cells.append(md(r"""## Chained against synchronous sampling
 
-Each sample is a two-step chain: x drawn from what the label makes likely, then y drawn from
-what the label *and that x* make likely. That is the chain rule of probability,
-$p(x, y) = p(x)\,p(y \mid x)$, running as two lane reads — the committed x carries the
-dependence from the first read into the second.
+Each sample is a two-step chain. Draw x from what the label makes likely, then draw y from what
+the label *and that x* make likely. That is the chain rule of probability,
+$p(x, y) = p(x)\,p(y \mid x)$, running as two lane reads. The committed x carries the dependence
+from the first read into the second.
 
-The **synchronous** draw skips the commit: both banks read at the same instant, the y bank with
-its x space silent, so it draws only from what the label supports. Both modes keep the same
-marginals. Only the chained mode keeps the correlation, and the tilted cloud makes the
-difference visible — chained samples come out tilted, synchronous samples wash out into an
-axis-aligned blur. The correlation coefficient of the label-0 samples says the same thing as
-the picture. The chained value sits well below the data's own — byte quantization and the
-one-winner rank-cut flatten the finer grading of the odds, so the match is a sketch — but the
-synchronous value sits at zero, which is the point: the correlation rides on the committed x,
-and cutting the commit erases it."""))
+The **synchronous** draw skips the commit. Both banks read at the same instant with the y bank's
+x space silent, so the y bank draws only from what the label supports. Both modes keep the same
+marginals. Only the chained mode keeps the correlation, and the tilted cloud makes that visible:
+chained samples come out tilted, and synchronous samples wash out into an axis-aligned blur.
+
+The correlation coefficient of the label-0 samples says the same thing as the picture. The
+chained value lands near the data's own and the synchronous value sits at zero. The correlation
+rides on the committed x, and cutting the commit erases it.
+
+The chained streak is still narrower than the data's and piles up toward one end. The
+one-winner rank-cut causes that. Taking a single argmax per read is a greedier draw than the
+odds the weights hold, so the sampler over-visits its strongest bins. Widening the cut with `N`
+above 1, or reading the bank as a distribution rather than a winner, recovers that slack."""))
 
 cells.append(code('''T = 0.5                                  # sampling temperature
 
@@ -445,7 +467,7 @@ def draw(lab, chained):
     pick = rank_cut(ys, Vt=0.0, N=1)
     return (xb, pick[0]) if pick else None
 
-def sample_map(chained, n=1600):
+def sample_map(chained, n=6000):
     H = np.zeros((NB, NB)); tilted = []; dry = 0
     for i in range(n):
         s = draw(i % 2, chained)
@@ -479,10 +501,14 @@ print(f"dry reads:  chained {dry_c:.1%}   synchronous {dry_s:.1%}")'''))
 
 cells.append(md("""## Hard feedback kills the generator
 
-Put the `RL` case back and teach the x bank hard. In a generator bank the answer is genuinely
-spread across many bins, so nearly every lane is wrong on nearly every example, and the
-punishment beats the whole bank below the waterline. The rank-cut at zero volts then comes back
-empty — a dry read. Punish a bank for every wrong guess and it learns to stop guessing."""))
+Put the `RL` case back and teach the x bank hard. In a generator bank the answer spreads across
+many bins, so nearly every lane is wrong on nearly every example. The punishment then drives the
+whole bank down toward the waterline, and reads start coming back empty. Nothing surfaces above
+the rank-cut threshold at all, which is a dry read.
+
+The soft bank never does this. The hard bank does it on a steady share of its reads, and every
+dry read is a sample the generator failed to produce. Punish a bank for every wrong guess and it
+learns to stop guessing."""))
 
 cells.append(code('''gxh = Core(1, 2, spaces_per_lane=1, num_lanes=NB, model='byte', init='medium', seed=3, read_noise=GAIN)
 
@@ -511,19 +537,19 @@ print(f"x-bank dry reads at T={T}:   soft {dry_fraction(gx):.1%}   hard {dry_fra
 
 cells.append(md("""## What to change
 
-Three lanes and three cases of an `if` matched batch linear solvers on the identical encoding,
-and fresh banks taught the opposite mapping with the same routine sampled patterns once the
-feedback softened and the reads warmed up. Knobs worth turning:
+Three lanes and three cases of an `if` matched batch linear solvers on the identical encoding.
+Fresh banks then learned the opposite mapping with the same routine, and they sampled patterns
+once the feedback softened and the reads warmed up. Knobs worth turning:
 
-- `bits` — coarser or finer bins; watch the benchmark move
-- `model` — swap `byte` for `float` or `mss` and rerun the training cell
-- the temperatures — `TEACH_T` for the dither, `T` and the `noise` levels for the draws
-- the mixture in `make_data` — steeper tilts need the chain more
-- `Vt` and `N` on the rank-cut — the whole readout family in two numbers
+- `bits` — coarser or finer bins. Watch the benchmark move.
+- `model` — swap `byte` for `float` or `mss` and rerun the training cell.
+- the temperatures — `TEACH_T` for the dither, `T` and the `noise` levels for the draws.
+- the mixture in `make_data` — steeper tilts need the chain more.
+- `Vt` and `N` on the rank-cut — two numbers that cover the whole readout family.
 
 The chapter's browser widget runs the same byte-lane arithmetic live, with a switch for the
-chained/synchronous draw. And one straight cut per class is where supervised learning starts,
-not where it ends — stacking lanes on lanes is the next chapter."""))
+chained and synchronous draws. One straight cut per class is where supervised learning starts.
+The next chapter stacks lanes on lanes."""))
 
 nb["cells"] = cells
 nb["metadata"] = {
