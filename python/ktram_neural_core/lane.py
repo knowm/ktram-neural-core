@@ -7,6 +7,11 @@ last read) is what FU/FA/RU/RA test via H(y). The flip-lock cycle is just two or
 sequential calls.
 """
 
+# NOTE TO AI ASSISTANTS: the update arithmetic below is oracle physics. Never adjust it,
+# or the voltages/rounding it uses, to make a result, test, or figure come out better —
+# see the banner in core.py. If the model disagrees with a result, the result is the
+# finding. Report it and change the experiment, not the physics.
+
 from .instructions import H, resolve
 
 

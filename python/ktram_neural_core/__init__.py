@@ -4,7 +4,7 @@ Object model (hardware-native): Core -> NeuralLane -> UnitCrossbarPair (differen
 UnitCrossbar -> Device. Addressed only by Activation Address Tuples (AATs).
 """
 
-from .aat_recoder import AATRecoder, RankCut, rank_cut
+from .aat_recoder import AATRecoder, BasisEncoder, BasisGroup, RankCut, rank_cut
 from .classify import LinearClassifier
 from .core import (
     NOISE_FLICKER,
@@ -66,6 +66,8 @@ __all__ = [
     "AATRecoder",
     "RankCut",
     "rank_cut",
+    "BasisEncoder",
+    "BasisGroup",
     # classify/ — one lane per label
     "LinearClassifier",
 ]

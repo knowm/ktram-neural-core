@@ -10,6 +10,7 @@ planning/06-aat-recoder-refactor.md.
 """
 
 from .base import AATRecoder
+from .basis_encoder import BasisEncoder, BasisGroup
 from .rank_cut import RankCut, rank_cut
 
-__all__ = ["AATRecoder", "RankCut", "rank_cut"]
+__all__ = ["AATRecoder", "RankCut", "rank_cut", "BasisEncoder", "BasisGroup"]

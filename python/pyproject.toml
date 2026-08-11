@@ -15,6 +15,10 @@ dependencies = ["numpy>=1.22"]
 [project.optional-dependencies]
 examples = ["matplotlib>=3.5", "scikit-learn>=1.0"]
 dev = ["pytest>=7"]
+# Intel-mac wheels stop at torch 2.2.2 (built against numpy 1.x); numpy 2 there breaks
+# torch.from_numpy with "Numpy is not available", so pin numpy below 2 on that platform.
+torch = ["torch>=2.0",
+         "numpy<2; sys_platform == 'darwin' and platform_machine == 'x86_64'"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -14,11 +14,11 @@ from ktram_neural_core import Core
 Z = (0,)
 
 
-def pulse(core, read, feedback, n):
+def pulse(core, read, feedback_instr, n):
     lane = core.lane(0)
     for _ in range(n):
         lane.evaluate(Z, read)
-        lane.evaluate(Z, feedback)
+        lane.evaluate(Z, feedback_instr)
     return lane.evaluate(Z, read)
 
 

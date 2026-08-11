@@ -17,17 +17,17 @@ from ktram_neural_core import Core   # noqa: E402
 Z = (0,)
 
 
-def execute_n(core, read, feedback, n, lane_index=0):
-    """Repeat `evaluate(read); evaluate(feedback)` n times, recording y/Ga/Gb each step.
+def execute_n(core, read, feedback_instr, n, lane_index=0):
+    """Repeat `evaluate(read); evaluate(feedback_instr)` n times, recording y/Ga/Gb each step.
 
-    `feedback=None` means make only the read call (the old XX no-op). Returns (ys, gas, gbs).
+    `feedback_instr=None` means make only the read call (the old XX no-op). Returns (ys, gas, gbs).
     """
     lane = core.lane(lane_index)
     ys, gas, gbs = [], [], []
     for _ in range(n):
         y = lane.evaluate(Z, read)
-        if feedback is not None:
-            lane.evaluate(Z, feedback)
+        if feedback_instr is not None:
+            lane.evaluate(Z, feedback_instr)
         ga, gb = core.read_gab(lane_index, Z)
         ys.append(y)
         gas.append(ga)
@@ -75,12 +75,12 @@ def low_voltage_read(instr="FFLV", model="rs", init="medium", n=500, seed=5):
 
 
 def inertia_pair(model="float", init="medium", y0=0.3,
-                 levels=(0.05, 0.5), feedback="RH", n=300, seed=1):
+                 levels=(0.05, 0.5), feedback_instr="RH", n=300, seed=1):
     """Matched weight, mismatched magnitude.
 
     Two synapse pairs are set to the SAME starting weight w = y0 but different magnitude
     m = Ga + Gb = 2 * level * GMax, using set_start_y(level=...). Both receive the identical
-    (FF, feedback) x n stream. Returns (cores, traces, levels) with traces[i] = (ys, gas, gbs)
+    (FF, feedback_instr) x n stream. Returns (cores, traces, levels) with traces[i] = (ys, gas, gbs)
     for levels[i]. The low-magnitude pair swings; the high-magnitude pair barely moves — the
     per-step change in w is proportional to 1/m.
     """
@@ -89,7 +89,7 @@ def inertia_pair(model="float", init="medium", y0=0.3,
         core = single_synapse_core(model, init, seed=seed)
         core.set_start_y(0, Z, y0, level)
         cores.append(core)
-        traces.append(execute_n(core, "FF", feedback, n))
+        traces.append(execute_n(core, "FF", feedback_instr, n))
     return cores, traces, levels
 
 

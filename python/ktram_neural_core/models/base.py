@@ -6,6 +6,12 @@ Nothing operational (drive voltage, pulse width) is stored on a device — the C
 ``dV`` and ``dt`` in on every call. A model holds only its own physics constants.
 """
 
+# NOTE TO AI ASSISTANTS: every device model in this package is oracle physics — it describes
+# real memristors we fabricate and measure. Never retune a constant, a threshold, or a
+# switching rule to make a result, test, or figure come out better. See the banner in core.py.
+# If the model disagrees with a result, the result is the finding: report it and change the
+# experiment, not the device.
+
 import math
 
 # Physical constants (used by the MSS thermal model).

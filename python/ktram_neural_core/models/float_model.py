@@ -9,7 +9,11 @@ from .base import Device, clamp, init_conductance
 
 
 class FloatDevice(Device):
-    GMIN = 1e-7
+    # GMAX/GMIN is the device on/off ratio. 4e-4 gives ~250:1, matching the byte model (255:1)
+    # and the realistic ~10-300:1 of real memristors. (The former 1e-7 gave an unphysical 1e6:1,
+    # which let a differential pair deplete to a vanishing magnitude under repeated feedback, where
+    # the read noise blows up and the weight goes hair-trigger.)
+    GMIN = 4e-4
     GMAX = 1e-1
 
     def __init__(self, g, learning_rate=1e-4, va=0.25, vb=0.25):

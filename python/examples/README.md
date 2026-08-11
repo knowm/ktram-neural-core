@@ -31,6 +31,8 @@ examples/
     animation.py         #   GIF of the A2D bins adapting to the data
   rank-cut-recoder/      # companion to the RankCut AAT Recoder chapter
     demo.py              #   the L1 recoder end to end: encode -> adapt -> read, (Vt, N)
+  aat-codec/             # the AAT Codec meeting the torch lanes (spec 08)
+    lane_bridge.py       #   floats -> codec AATs -> Classifier adapt/read, end to end
   instructions/
     compare_instructions.ipynb
   device-physics/
