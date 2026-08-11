@@ -28,24 +28,24 @@ Median vectors/sec; regenerate the full tables with `bench_lane_read.py --sectio
 The two `—` cells were skipped after the S=64 shape pinned the incumbent's rate (it chunks
 internally, so it scales linearly in B).
 
-| shape | variant | B=1 | B=64 | B=4096 | B=65536 |
-|---|---|---:|---:|---:|---:|
-| decoder [1568, k16, S64] | incumbent (frozen) | 3,160 | 5,247 | 4,917 | 4,753 |
-| | bag-fp32 (live) | 9,742 | 75,257 | 43,741 | 46,477 |
-| | **fbgemm-i8 (frozen)** | 10,134 | 74,470 | 43,744 | 44,910 |
-| | dense int8 (control) | 62,724 | 2,271,771 | 1,384,338 | 1,061,142 |
-| encoder per-group [16×64, k49, S2] | incumbent (live) | 2,129 | 3,547 | 2,856 | 2,761 |
-| | **bag-fp32 (live)** | 7,011 | 45,388 | 41,957 | 50,890 |
-| | fbgemm-i8 (frozen) | 6,363 | 43,111 | 49,062 | 52,310 |
-| | dense fp32 (control) | 169,893 | 1,752,713 | 1,137,756 | 1,183,243 |
-| xfmr [1024, k512, S64] | incumbent (frozen) | 58 | 261 | 272 | 263 |
-| | bag-fp32 (live) | 3,931 | 4,121 | 6,886 | 6,771 |
-| | **fbgemm-i8 (frozen)** | 5,569 | 6,644 | 19,583 | 17,724 |
-| | dense int8 (control) | 30,048 | 168,721 | 248,642 | 282,971 |
-| xfmr [1024, k512, S16] | incumbent (frozen) | 265 | 259 | 291 | — |
-| | bag-fp32 (live) | 3,469 | 7,278 | 8,651 | 8,455 |
-| | **fbgemm-i8 (frozen)** | 4,968 | 17,016 | 37,938 | 35,401 |
-| | dense int8 (control) | 22,392 | 156,235 | 283,560 | 292,197 |
+| shape                              | variant                |     B=1 |      B=64 |    B=4096 |   B=65536 |
+| ---------------------------------- | ---------------------- | ------: | --------: | --------: | --------: |
+| decoder [1568, k16, S64]           | incumbent (frozen)     |   3,160 |     5,247 |     4,917 |     4,753 |
+|                                    | bag-fp32 (live)        |   9,742 |    75,257 |    43,741 |    46,477 |
+|                                    | **fbgemm-i8 (frozen)** |  10,134 |    74,470 |    43,744 |    44,910 |
+|                                    | dense int8 (control)   |  62,724 | 2,271,771 | 1,384,338 | 1,061,142 |
+| encoder per-group [16×64, k49, S2] | incumbent (live)       |   2,129 |     3,547 |     2,856 |     2,761 |
+|                                    | **bag-fp32 (live)**    |   7,011 |    45,388 |    41,957 |    50,890 |
+|                                    | fbgemm-i8 (frozen)     |   6,363 |    43,111 |    49,062 |    52,310 |
+|                                    | dense fp32 (control)   | 169,893 | 1,752,713 | 1,137,756 | 1,183,243 |
+| xfmr [1024, k512, S64]             | incumbent (frozen)     |      58 |       261 |       272 |       263 |
+|                                    | bag-fp32 (live)        |   3,931 |     4,121 |     6,886 |     6,771 |
+|                                    | **fbgemm-i8 (frozen)** |   5,569 |     6,644 |    19,583 |    17,724 |
+|                                    | dense int8 (control)   |  30,048 |   168,721 |   248,642 |   282,971 |
+| xfmr [1024, k512, S16]             | incumbent (frozen)     |     265 |       259 |       291 |         — |
+|                                    | bag-fp32 (live)        |   3,469 |     7,278 |     8,651 |     8,455 |
+|                                    | **fbgemm-i8 (frozen)** |   4,968 |    17,016 |    37,938 |    35,401 |
+|                                    | dense int8 (control)   |  22,392 |   156,235 |   283,560 |   292,197 |
 
 **The winner.** FBGEMM's int8 embedding bag on the frozen tier, the float32 bag on the live
 tier. Against the incumbent: 3–10× at the generator's real shapes, 67–130× at transformer

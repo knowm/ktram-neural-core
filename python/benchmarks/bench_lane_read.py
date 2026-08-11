@@ -1,4 +1,4 @@
-"""Benchmark the lane read as what it is — an embedding bag — against its dense twin.
+"""Benchmark the lane read as an embedding bag — against its dense twin.
 
 Three sections, each emitting a markdown block into lane-read-bench-data.md (the curated
 report, lane-read-bench.md, reads these numbers):

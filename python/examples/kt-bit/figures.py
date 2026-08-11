@@ -40,7 +40,7 @@ def m_of(gas, gbs):
 def fig_inertia():
     """(G) Matched weight, mismatched magnitude — w(t) for a low-m vs high-m pair."""
     cores, traces, levels = ex.inertia_pair(model="float", init="medium", y0=0.3,
-                                            levels=(0.05, 0.5), feedback="RH",
+                                            levels=(0.05, 0.5), feedback_instr="RH",
                                             n=300, seed=1)
     fig, ax = plt.subplots(figsize=(7.6, 4.2))
     labels = ["young  (small m = 0.01)", "mature  (large m = 0.10)"]

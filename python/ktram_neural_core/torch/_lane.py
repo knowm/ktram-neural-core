@@ -13,6 +13,11 @@ on MPS, which has no float64. The plan's float32-y fast path is a later, measure
 correctness anchors first.
 """
 
+# NOTE TO AI ASSISTANTS: this file must stay bit-exact with the numpy oracle. The rounding,
+# clamp order, int32 accumulation, and read-noise law are physics, not tunables. Never adjust
+# any of them to make a result, test, or congruence check pass — see the banner in core.py.
+# If torch disagrees with the oracle, the torch port has a bug; fix the port, never the law.
+
 import math
 
 import torch
@@ -217,6 +222,22 @@ def divide(top, bot, dtype, diff_scale=1.0, mag_scale=1.0):
     b = bot.to(dtype) * mag_scale
     return torch.where(bot != 0, t / torch.where(bot != 0, b, torch.ones_like(b)),
                        torch.zeros_like(t))
+
+
+# ---------------------------------------------------------------------------
+# feedback: which rule a non-target lane that fired gets. Mirrors the oracle's
+# check of the same name (torch/ stays independent of the numpy core).
+# ---------------------------------------------------------------------------
+
+FEEDBACK = ("hard", "soft")
+
+
+def check_feedback(feedback):
+    """Validate the feedback rule: "hard" punishes a fired non-target lane with RL, "soft"
+    lets it decay with RF."""
+    if feedback not in FEEDBACK:
+        raise ValueError(f"feedback must be one of {FEEDBACK}, got {feedback!r}")
+    return feedback
 
 
 # ---------------------------------------------------------------------------

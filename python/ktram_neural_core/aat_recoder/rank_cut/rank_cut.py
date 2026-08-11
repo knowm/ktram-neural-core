@@ -6,6 +6,16 @@ neural lane per label, with the analog contained inside.
 
 from ..base import AATRecoder
 
+FEEDBACK = ("hard", "soft")
+
+
+def check_feedback(feedback):
+    """Validate the feedback rule: "hard" punishes a fired non-target lane with RL, "soft"
+    lets it decay with RF. (Mirrored in torch/_lane.py; torch/ stays independent.)"""
+    if feedback not in FEEDBACK:
+        raise ValueError(f"feedback must be one of {FEEDBACK}, got {feedback!r}")
+    return feedback
+
 
 def rank_cut(y_vector, Vt=0.0, N=None):
     """Readout policy: keep lanes with y >= Vt, sort descending, return the first N as an
@@ -48,12 +58,20 @@ class RankCut(AATRecoder):
         y = [self.evaluate(in_aat, "FFLV", lane) for lane in self._lanes]
         return rank_cut(y, self.Vt, self.N)
 
-    def adapt(self, in_aat, teach):
+    def adapt(self, in_aat, teach, feedback="hard"):
         """Supervised learn: adapting FF read on every lane, the RH/RL/RF routine vs `teach`,
-        then recode the FF read it just saw."""
+        then recode the FF read it just saw.
+
+        `feedback` picks the rule for a non-target lane that fired (y > 0). "hard" drives it
+        down with RL, which maximizes the classification margin and is what a classifier wants.
+        "soft" drops the RL term, so that lane decays with RF like every other non-target lane,
+        and the bank keeps every answer the data supports instead of one winner — the weights
+        you want when the read is going to be sampled rather than won.
+        """
+        check_feedback(feedback)
         target = self._target_lanes(teach)
         y = [self.evaluate(in_aat, "FF", lane) for lane in self._lanes]
-        fired = {lane for lane in self._lanes if y[lane] > 0}
+        fired = {lane for lane in self._lanes if y[lane] > 0} if feedback == "hard" else set()
         for lane in self._lanes:
             instr = "RH" if lane in target else "RL" if lane in fired else "RF"
             self.evaluate(in_aat, instr, lane)

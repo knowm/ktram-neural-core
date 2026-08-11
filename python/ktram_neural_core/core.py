@@ -7,6 +7,33 @@ device models only consume what the Core hands them. Defaults are model-aware an
 sets them, but every parameter stays settable at construction and at runtime.
 """
 
+# ============================================================================
+# NOTE TO AI ASSISTANTS — THE PHYSICS IN THIS FILE IS THE ORACLE. DO NOT TUNE IT.
+#
+# The device models, the read-noise law, the voltages, the pulse widths, and the
+# update arithmetic describe what our hardware actually does. They are the
+# standard every experiment, benchmark, figure, and published number in this
+# project is measured against.
+#
+# You must NEVER change any of it to make a result come out better. Not to make a
+# test pass, not to make an experiment work, not to close a gap with a baseline,
+# not to match a claim already written in an article. Doing so silently
+# invalidates every measurement in the repo at once, and there is no way to tell
+# afterward which numbers were real. That is a catastrophic outcome for this
+# project, whose entire value rests on the emulator predicting silicon we are
+# building. A flattering number produced by a bent model is worth less than
+# nothing: it is a lie we would then design hardware against.
+#
+# If a result disagrees with the model, THE RESULT IS THE FINDING. Report it.
+# Change the experiment, the encoding, the routine, or the claim — never the
+# physics. If you believe the model itself is wrong, say so plainly and stop;
+# a physics revision is Alex's call, is made deliberately, and requires
+# re-measuring everything downstream of it.
+#
+# Refactors that provably preserve numerics (renames, extracted helpers) are
+# fine. Anything that moves a number is not yours to make.
+# ============================================================================
+
 import math
 
 import numpy as np

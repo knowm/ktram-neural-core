@@ -20,12 +20,12 @@ from ktram_neural_core.core import (
 Z = (0,)
 
 
-def _gab_trace(core, n, read="FF", feedback="RH"):
+def _gab_trace(core, n, read="FF", feedback_instr="RH"):
     lane = core.lane(0)
     out = []
     for _ in range(n):
         lane.evaluate(Z, read)
-        lane.evaluate(Z, feedback)
+        lane.evaluate(Z, feedback_instr)
         out.append(core.read_gab(0, Z))
     return out
 
