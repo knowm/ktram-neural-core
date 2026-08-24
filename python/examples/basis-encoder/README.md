@@ -51,8 +51,10 @@ commits a dataset or a rendered image.
 ## What the experiments show (measured on the emulator; Alex validates)
 
 - **Exclusion prevents collapse.** Off, one lane wins every pattern (utilization → ~0).
-- **Recruitment protects purity.** Off, coverage holds but the codebook smears (purity ~halves) and
-  the cycle stalls.
+- **Recruitment protects coverage.** Off, fewer than half the lanes ever win (utilization ~0.46) and
+  coverage falls from ~0.94 to ~0.60: the lanes that start badly never get going, so the patterns
+  they should have claimed go unclaimed. The arm runs `abandon_action="reset"`, so the cycle still
+  turns and the comparison isolates recruitment rather than a frozen run.
 - **The unsupervised code is more linearly separable than the raw input** (raw ≈ 0.81 → basis ≈ 0.95
   on the synthetic 8-class source).
 - **On Fashion-MNIST**, recognizable garment prototypes emerge with no labels; withdrawing recruitment
