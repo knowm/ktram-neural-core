@@ -25,11 +25,11 @@ def run_ablation(seeds=(0,), n_snapshots=24):
     """The 3-arm ablation. seeds[0] carries the snapshots (for the animation); extra seeds add
     metric spread for the headline table."""
     arms = {}
-    for label, exc, rec in ARMS:
+    for label, exc, rec, action in ARMS:
         per_seed = []
         snaps = None
         for i, seed in enumerate(seeds):
-            r = train_and_eval(exc, rec, seed=seed,
+            r = train_and_eval(exc, rec, action, seed=seed,
                                n_snapshots=(n_snapshots if i == 0 else 0))
             per_seed.append(r["metrics"])
             if i == 0:
@@ -47,7 +47,8 @@ def run_ablation(seeds=(0,), n_snapshots=24):
 
 
 def run_sweep(corruptions=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), seed=0,
-              arms=(("both on", True, True), ("recruitment off", True, False))):
+              arms=(("both on", True, True, "recruit"),
+                    ("recruitment off", True, False, "reset"))):
     """Coverage / purity / utilization vs corruption, one seed (a search, so one seed per the
     compute-economy norm). Defaults to both-on plus recruitment-off, so the purity gap is visible
     across the difficulty range without paying for the collapsed exclusion-off arm at every point."""
@@ -55,8 +56,8 @@ def run_sweep(corruptions=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), seed=0,
     for corr in corruptions:
         cfg = dict(CONFIG, corruption=corr)
         point = {"corruption": corr}
-        for label, exc, rec in arms:
-            r = train_and_eval(exc, rec, config=cfg, seed=seed)
+        for label, exc, rec, action in arms:
+            r = train_and_eval(exc, rec, action, config=cfg, seed=seed)
             point[label] = r["metrics"]
             print(f"  corr={corr} {label:16s} {r['metrics']}", flush=True)
         rows.append(point)

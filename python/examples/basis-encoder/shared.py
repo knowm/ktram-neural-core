@@ -26,11 +26,16 @@ EPOCHS = 4
 N_TRAIN = 4000
 N_EVAL = 3000
 
-# (label, exclusion, recruitment) — the three-panel ablation.
+# (label, exclusion, recruitment, abandon_action) — the three-panel ablation.
+#
+# The recruitment-off arm resets the stalled cycle rather than leaving it to hang. With
+# abandon_action="recruit" and recruitment off, nothing ever clears the won-buffer, so exclusion
+# throttles almost every update and the arm measures a frozen run instead of the absence of
+# recruitment. "reset" is the fair comparison: same exclusion, no force-feeding, cycle still turns.
 ARMS = [
-    ("both on", True, True),
-    ("exclusion off", False, True),
-    ("recruitment off", True, False),
+    ("both on", True, True, "recruit"),
+    ("exclusion off", False, True, "recruit"),
+    ("recruitment off", True, False, "reset"),
 ]
 
 
@@ -41,9 +46,9 @@ def _pow2(n):
     return p
 
 
-def train_and_eval(exclusion, recruitment, *, config=CONFIG, channels=S, ga=GATHER_ABANDON,
-                   epochs=EPOCHS, n_train=N_TRAIN, n_eval=N_EVAL, seed=0, n_snapshots=0,
-                   snap_eval=800):
+def train_and_eval(exclusion, recruitment, abandon_action="recruit", *, config=CONFIG, channels=S,
+                   ga=GATHER_ABANDON, epochs=EPOCHS, n_train=N_TRAIN, n_eval=N_EVAL, seed=0,
+                   n_snapshots=0, snap_eval=800):
     """Train one BasisGroup and evaluate it. Returns a dict of metrics, the final win-count matrix,
     and (if n_snapshots>0) a list of (fraction_trained, matrix) snapshots for the animation.
 
@@ -55,7 +60,8 @@ def train_and_eval(exclusion, recruitment, *, config=CONFIG, channels=S, ga=GATH
     core = Core(1, _pow2(src.s_in), spaces_per_lane=src.n_spaces, num_lanes=channels,
                 model="byte", init="low", read_noise=0, seed=100 + seed)
     grp = BasisGroup(core, channels, gather_abandon=ga,
-                     exclusion=exclusion, recruitment=recruitment)
+                     exclusion=exclusion, recruitment=recruitment,
+                     abandon_action=abandon_action)
 
     train_aats, _, _ = src.batch(n_train)
     eval_aats, eval_gens, _ = src.batch(n_eval)

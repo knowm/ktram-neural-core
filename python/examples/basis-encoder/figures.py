@@ -95,7 +95,7 @@ def fig_metrics_bars(data):
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("score", color=INK)
     ax.set_title(f"Ablation over {len(data['seeds'])} seeds — exclusion prevents collapse, "
-                 "recruitment sharpens purity", fontsize=11, color=INK)
+                 "recruitment keeps the bank in play", fontsize=11, color=INK)
     ax.legend(frameon=False, fontsize=9)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color=GRID, linewidth=0.6)
