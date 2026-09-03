@@ -182,7 +182,7 @@ changing it, and takes the winner."""))
 
 cells.append(code('''LABELS = [0, 1, 2]
 core = Core(1, 8, spaces_per_lane=len(encoder.space_sizes), num_lanes=len(LABELS),
-            model='byte', init='low', read_noise=0.0, seed=0)
+            model='byte', init='low', read_noise=0.0, seed=0, comparator_enabled=False)
 
 rng = np.random.default_rng(0)
 for _ in range(5):                                 # phase one: adapt the bins, classifier off
@@ -329,7 +329,9 @@ rather than verdicts, and only where the data left the question open. Push to `n
 the hiss swallows everything, the setosa included. The useful sampler sits between those two
 settings."""))
 
-cells.append(code('''core.set_read_noise(0.02)                       # the hiss back on (0 disabled it for training)
+cells.append(code('''core.set_read_noise(0.02)                       # the noise back on (0 disabled it for training)
+# The core was built with comparator_enabled=False, so this is the device read alone — the
+# emulator's default read also carries a comparator term. See Core.read_sample.
 
 def top_gap(f):
     a = encoder.encode(f)
@@ -415,8 +417,8 @@ bin_of = lambda v: min(NB - 1, int(v * NB))
 
 # read noise ON and louder than the device default — the dither and the sampling both use it
 GAIN = 0.2
-gx = Core(1, 2, spaces_per_lane=1, num_lanes=NB, model='byte', init='medium', seed=1, read_noise=GAIN)
-gy = Core(1, NB, spaces_per_lane=2, num_lanes=NB, model='byte', init='medium', seed=2, read_noise=GAIN)
+gx = Core(1, 2, spaces_per_lane=1, num_lanes=NB, model='byte', init='medium', seed=1, read_noise=GAIN, comparator_enabled=False)
+gy = Core(1, NB, spaces_per_lane=2, num_lanes=NB, model='byte', init='medium', seed=2, read_noise=GAIN, comparator_enabled=False)
 
 def teach_soft(bank, aat, target):
     """FF, then RH on the target and RF on everyone else. No RL — the one-line difference."""
@@ -510,7 +512,7 @@ The soft bank never does this. The hard bank does it on a steady share of its re
 dry read is a sample the generator failed to produce. Punish a bank for every wrong guess and it
 learns to stop guessing."""))
 
-cells.append(code('''gxh = Core(1, 2, spaces_per_lane=1, num_lanes=NB, model='byte', init='medium', seed=3, read_noise=GAIN)
+cells.append(code('''gxh = Core(1, 2, spaces_per_lane=1, num_lanes=NB, model='byte', init='medium', seed=3, read_noise=GAIN, comparator_enabled=False)
 
 def teach_hard(bank, aat, target):
     for lane in range(NB):

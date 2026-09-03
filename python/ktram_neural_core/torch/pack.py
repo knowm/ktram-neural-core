@@ -13,6 +13,7 @@ Two carriers of the same pack:
 
 import json
 import pathlib
+import warnings
 
 import numpy as np
 
@@ -20,7 +21,26 @@ import numpy as np
 _PREFIX = {"encoder": "enc", "decoder": "dec", "classifier": "clf"}
 _BLOB_ORDER = ["encoder", "decoder", "classifier"]
 _NOISE_KEYS = ["a_thermal_unit", "a_flicker_unit", "sqrt_ref_m", "flicker_ln_ref",
-               "ref_pw", "read_pw", "v_fflv"]
+               "ref_pw", "read_pw", "v_fflv", "v_cmp"]
+
+# Keys a pack written before the comparator term existed cannot carry. Always written now; on
+# read they are optional, and a pack missing them loads at the emulator's default (see
+# _warn_pre_comparator). The browser emulator reads this block by key and does not model the
+# comparator, so the new key is inert there — but no existing key is renamed or removed.
+_POST_COMPARATOR_KEYS = ("v_cmp",)
+
+
+def _warn_pre_comparator(noise):
+    """A pack written before the comparator term has no level in it, so it loads at the
+    emulator's default rather than at zero: the comparator is part of the read model, not part
+    of the artifact, and an old pack was always read by SOME comparator. Say so once, because a
+    silently applied default is how a number moves without anyone choosing it."""
+    if noise and not any(k in noise for k in _POST_COMPARATOR_KEYS):
+        warnings.warn(
+            "pack has no comparator noise level (written before the term existed); "
+            "loading at the emulator's default comparator. Pass v_cmp explicitly, or "
+            "sample_read(..., comparator=False), to pin the device-only read.",
+            stacklevel=3)
 
 
 def _base(path):
@@ -48,6 +68,7 @@ def load_section(path, section):
         p = _PREFIX[section]
         noise = {k: float(data[f"noise_{k}"]) for k in _NOISE_KEYS
                  if f"noise_{k}" in data.files}
+        _warn_pre_comparator(noise)
         return (data[f"{p}_diff"], data[f"{p}_mag"],
                 float(data[f"{p}_diff_scale"]), float(data[f"{p}_mag_scale"]), noise)
 
@@ -65,8 +86,10 @@ def load_section(path, section):
         mag = blob[offset + n:offset + 2 * n].reshape(shape)
         offset += 2 * n
         if name == section:
+            noise = dict(manifest.get("noise", {}))
+            _warn_pre_comparator(noise)
             return (diff.copy(), mag.copy(), float(manifest[name]["diff_scale"]),
-                    float(manifest[name]["mag_scale"]), dict(manifest.get("noise", {})))
+                    float(manifest[name]["mag_scale"]), noise)
     raise AssertionError("unreachable")
 
 

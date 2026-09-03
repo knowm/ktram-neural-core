@@ -99,7 +99,8 @@ Core(crossbar_rows, crossbar_cols,
      forward_low_voltage=None, reverse_low_voltage=None,
      pulse_width=None,
      read_noise=READ_NOISE, noise_thermal=NOISE_THERMAL, noise_flicker=NOISE_FLICKER,
-     temperature=ROOM_TEMPERATURE_K, read_noise_ref_m=None)
+     temperature=ROOM_TEMPERATURE_K, read_noise_ref_m=None,
+     comparator_enabled=True, comparator_code=COMPARATOR_CODE)
 ```
 
 | Parameter | What it sets |
@@ -115,11 +116,13 @@ Core(crossbar_rows, crossbar_cols,
 | `forward_voltage` / `reverse_voltage` | Standard drive voltages. `None` = model-aware default. |
 | `forward_low_voltage` / `reverse_low_voltage` | Sub-threshold ("low") read voltages. `None` = model-aware default. |
 | `pulse_width` | Write/update time `dt` in seconds. `None` = model-aware default. |
-| `read_noise` | Master read-noise gain (the kT-bit's hiss). The weight-referred σ is *quoted at the reference operating point* (room temp, reference read voltage and magnitude), **not** a fixed per-read value. Default `0.02`; `0` = a deterministic core. The realized noise has two physically shaped mechanisms that scale on top of it — see "Read noise" below. |
+| `read_noise` | Master gain of the two **device** noise terms. The weight-referred σ is *quoted at the reference operating point* (room temp, reference read voltage and magnitude), **not** a fixed per-read value. Default `0.02`; `0` = a deterministic core. This is the device's **calibration**, not an operating dial — see "Read noise" below. |
 | `noise_thermal` | Weight of the **thermal** (Johnson) noise term — the small voltage-dependent floor. Default `0.1`. |
 | `noise_flicker` | Weight of the **flicker / RTN** (1/f) term — the dominant memristor read noise. Default `1.0`. |
 | `temperature` | Operating temperature in kelvin (the `sqrt(T)` dependence of the thermal term). Default 298 K. |
 | `read_noise_ref_m` | Reference magnitude for noise calibration. `None` = the model's own `GMAX`. |
+| `comparator_enabled` | Whether the comparator that resolves the read is modeled. Default `True`. `False` gives the device-only law — that is a statement about the *model*, not a circuit setting, and it is the switch that reproduces pre-comparator results. |
+| `comparator_code` | The comparator's 8-bit trim register, `0`–`255`. Default `10` (300 µV rms). Validated as an integer; a float raises. See "Read noise" below. |
 
 Model-aware defaults (`MODEL_DEFAULTS`): float/byte/rs drive at ±1 with low voltages ±0.05; MSS
 drives at ±0.25 (its switching threshold is ~0.27 V). RS uses `pulse_width=1e-8` so its old
@@ -135,10 +138,13 @@ Invalid `model` / `fidelity` / `init` names raise `KeyError` listing the valid c
 | `evaluate(aat, instruction, lane_index=0, noise=0.0)` | Run one instruction on a lane; return `y`. Convenience wrapper over `lane.evaluate`. |
 | `v_app(instruction)` | Signed applied voltage for an instruction (direction × standard/low). |
 | `drive_voltage(direction)` | Standard drive voltage of a direction (used to set the feedback `Vy`). |
-| `read_sample(y_clean, m, v_app)` | Apply read noise (thermal + flicker) to a clean read (see "Read noise" below). |
+| `read_sample(y_clean, m, v_app)` | Apply read noise (thermal + flicker + comparator) to a clean read (see "Read noise" below). |
 | `set_voltages(...)` | Change any of the four drive/low voltages at runtime. |
 | `set_pulse_width(dt)` | Change the write/update time at runtime. |
-| `set_read_noise(read_noise=None, noise_thermal=None, noise_flicker=None, temperature=None, read_noise_ref_m=None)` | Tune the read-noise gains/temperature at runtime; `read_noise=0` disables read noise. Recomputes the cached coefficients. |
+| `set_read_noise(read_noise=None, noise_thermal=None, noise_flicker=None, temperature=None, read_noise_ref_m=None)` | Tune the **device** noise gains/temperature at runtime; `read_noise=0` disables read noise entirely, comparator included. Recomputes the cached coefficients. |
+| `set_comparator(enabled=None, code=None)` | Set the comparator switch and/or its trim register at runtime. The register survives being switched off. |
+| `set_comparator_noise(v_n, round_ok=False)` | Set the register from a requested rms voltage. Converts in integer microvolts; below the floor raises, and a level that is not an exact code raises unless `round_ok`. Returns the code set. |
+| `comparator_noise` | *(property, read-only)* The register as volts, `0.0` when disabled. The register is the source of truth; this is derived. |
 | `read_gab(lane_index, aat)` | Read back `(Ga, Gb)` for the enabled spaces of an AAT. **Debug/plot only.** Returns one tuple for a single enabled space, else a list. |
 | `set_gab(lane_index, aat, ga, gb)` | Force `(Ga, Gb)` on the enabled spaces. **Debug/setup only.** Lets different device types start in the same state. |
 | `set_start_y(lane_index, aat, y0, level=0.5)` | Place the enabled synapses at a target weight `y0 ∈ [-1, 1]`, identically across models regardless of conductance scale. `level` sets the pair magnitude. |
@@ -290,18 +296,20 @@ init (`randVar=0`) draws nothing from the RNG.
 ## Read noise
 
 Configured on the `Core` and applied in `read_sample`.
-A read carries **two physically distinct noise mechanisms**, summed in quadrature and referred
+A read carries **three physically distinct noise mechanisms**, summed in quadrature and referred
 to the weight (`y = Vy/V_app`):
 
 ```
-σ_thermal = read_noise * noise_thermal * sqrt(T / T_ref) * (V_ref / |V_app|) * sqrt(m_ref / m)
-σ_flicker = read_noise * noise_flicker * (1 − y²)        *                      sqrt(m_ref / m)
-σ_y       = sqrt(σ_thermal² + σ_flicker²)
+σ_thermal    = read_noise * noise_thermal * sqrt(T / T_ref) * (V_ref / |V_app|) * sqrt(m_ref / m)
+σ_flicker    = read_noise * noise_flicker * (1 − y²)        *                      sqrt(m_ref / m)
+σ_comparator = v_cmp / |V_app|
+σ_y          = sqrt(σ_thermal² + σ_flicker² + σ_comparator²)
 ```
 
-Two mechanisms, because real memristor read noise has more than one source. Each has its own
-functional form; each carries a tuning constant that folds in the parts the emulator does not
-model from first principles (read bandwidth, 1/f corner, the Hooge factor).
+The first two are the **device**, and `read_noise` is their calibrated gain. The third is the
+**periphery**, and it is the only one a circuit designer sets. Each device term has its own
+functional form and carries a tuning constant that folds in the parts the emulator does not model
+from first principles (read bandwidth, 1/f corner, the Hooge factor).
 
 **Thermal (Johnson–Nyquist)** — additive voltage noise over the signal. The node sees the two
 memristors in parallel, so its thermal voltage noise is `4·k_B·T / (Ga+Gb)` per unit bandwidth;
@@ -311,6 +319,43 @@ This is the small floor (`noise_thermal` default `0.1`).
 **Flicker / RTN (1/f)** — multiplicative conductance fluctuation (`δG/G`), the *dominant* read
 noise in real memristors. Propagating `δGa, δGb` through `y = (Ga−Gb)/(Ga+Gb)` gives a `(1 − y²)`
 factor and **no `V_app` dependence**. This is the larger term (`noise_flicker` default `1.0`).
+
+**Comparator** — the input-referred noise of the comparator that resolves the read. Nothing reads
+a lane directly: a comparator decides every read, and every comparator has input-referred noise —
+`kT/C` on the regeneration nodes plus the preamp's thermal noise (Razavi, *The StrongARM Latch*,
+IEEE SSC Magazine 7(2), 2015). It is **periphery, not device**: flat in `y`, flat in `m`, and
+**not** multiplied by `read_noise`, because `read_noise` is the device's gain and scaling this
+term by it would make it a device term. It divides by `|V_app|` because the read is referred to
+the weight. Comparator **offset** is a different quantity (Pelgrom matching), static per lane and
+absorbed by learning; it is not part of this law.
+
+Modeling a read *without* a comparator does not model an ideal comparator — it models the absence
+of one, which no hardware can perform. So the term is **on by default**, and
+`comparator_enabled=False` is the switch that reproduces pre-comparator results.
+
+The level is an 8-bit trim register measured **up from a floor**, because no comparator reaches
+zero input-referred noise:
+
+```
+v_cmp = COMPARATOR_V_MIN + comparator_code * COMPARATOR_V_STEP
+      = 100 µV + code · 20 µV,   code ∈ [0, 255]   →   100 µV … 5.20 mV
+```
+
+Code `0` is the *quietest comparator modeled*, not the absence of one. The register is the source
+of truth: `set_comparator_noise(v_n)` converts in integer microvolts and returns the code, and
+`comparator_noise` reads back what was achieved. A request below the floor raises rather than
+clamping — it asks for a design class this emulator does not model. The 20 µV step puts the levels
+that matter on exact codes: 300 µV = 10, 1.00 mV = 45, 3.00 mV = 145.
+
+| design class | input-referred noise | offset |
+|---|---|---|
+| raw dynamic latch | 0.5–2 mV rms | 5–20 mV |
+| auto-zeroed | 50–200 µV rms | 0.1–1 mV |
+| trimmed | tens of µV | — |
+
+Trimmed comparators sit below the floor and are deliberately not representable: that is a
+different design class at a different cost, and reaching it means moving `COMPARATOR_V_MIN`, which
+is a visible edit rather than a silently available setting.
 
 The knobs, in the order you'd actually reach for them:
 
@@ -329,6 +374,16 @@ The knobs, in the order you'd actually reach for them:
    magnitude — a read is a posterior-shaped sample.
 4. **Temperature `T`** — the `sqrt(T)` dependence of the thermal term; settable, room-temp
    default.
+5. **Comparator register `comparator_code` — the settable one.** Flat periphery noise, `1/|V_app|`
+   like thermal but independent of `read_noise`, `T` and the pulse width. On real silicon its level
+   is set by transistor size, capacitance and bias current, and it can be **raised at no cost**
+   (starve the preamp bias, strobe the latch earlier, inject at the input). This is the dial a
+   circuit actually has, and it is what makes the substrate usable as a sampler.
+
+**`read_noise` is a calibration, not a dial.** It is the device's measured gain. The operating
+knobs are the read voltage `V_app`, the read pulse width, and the comparator register — turning
+`read_noise` up to raise a read's temperature asks the emulator for noise the modeled hardware
+cannot produce.
 
 `read_noise` is the **master gain**, quoted at the reference operating point (read voltage
 `V_ref`, `m = m_ref`, `T = T_ref`, `y = 0`); `noise_thermal` and `noise_flicker` set the mix, so
@@ -340,12 +395,19 @@ one Gaussian draw.
 Noise rides **only on the returned/retained value** (what `H()` and any threshold see). The
 devices are driven by the clean read, so state stays deterministic and a sub-threshold read
 stays exactly non-disturbing. `read_noise=0` (or `m≤0`) returns the clean read untouched and
-draws nothing — a noise-disabled core reproduces the deterministic output bit-for-bit. Output is
-clamped to `[-1, 1]`.
+draws nothing **regardless of the comparator** — that is the one deterministic test mode, and an
+ideal device behind a noisy comparator is a nonphysical combination. A noise-disabled core
+reproduces the deterministic output bit-for-bit. Output is clamped to `[-1, 1]`.
 
 The mix and magnitude (`noise_thermal`, `noise_flicker`, and `read_noise` itself) are calibration
 constants to be fit against measured devices; the defaults set the *shape*, not a validated noise
-budget.
+budget. At the reference read (`V_app` = 50 mV) the default register contributes `v_cmp/V = 0.006`
+against the device's 0.02, raising σ by about 4.4%.
+
+The torch modules carry the same law: `NoiseParams.sigma_unit` is **device only** — downstream
+code reads it directly to build its own budgets — and `NoiseParams.sigma(y, m, T)` is the
+composite. `sample_read(y, m, T, params, generator, comparator=None)` takes `comparator=False`
+for a device-only draw at one call site, without disturbing params other readers share.
 
 ```python
 # A noisy, non-disturbing read for biased random bits:
