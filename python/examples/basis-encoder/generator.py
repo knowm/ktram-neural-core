@@ -93,8 +93,11 @@ def _train_group(patches, seed):
     """Form-then-sharpen with FULL epochs: ENC_FORM_EPOCHS passes with recruitment on (populate the
     64-wide bank), then ENC_SHARPEN_EPOCHS passes with recruitment off + reset (non-competitive lanes
     fade, survivors sharpen). Starting wide and self-pruning yields a sharp, high-quality basis."""
+    # comparator_enabled=False: _set_temperature drives read_noise as the widget's temperature
+    # knob, and the browser reimplementation below models the device law only. Pinning the
+    # comparator off keeps the two identical. The read law's third term is Core.read_sample's.
     core = Core(1, _pow2(LEVELS), spaces_per_lane=N_PIX_PATCH, num_lanes=BASIS, model="byte",
-                init=INIT, read_noise=0, seed=seed)
+                init=INIT, read_noise=0, seed=seed, comparator_enabled=False)
     grp = BasisGroup(core, BASIS, gather_abandon=GATHER_ABANDON, exclusion=True, recruitment=True,
                      abandon_action="recruit")
     for _ in range(ENC_FORM_EPOCHS):            # form: recruitment on, whole width populates
@@ -152,7 +155,8 @@ def encode_indices(groups, image, temperature=0.0):
 class NeuralPixelDecoder:
     def __init__(self, seed=0):
         self.core = Core(1, BASIS, spaces_per_lane=N_GROUPS, num_lanes=N_DEC_LANES,
-                         model="byte", init=INIT, read_noise=0, seed=seed)
+                         model="byte", init=INIT, read_noise=0, seed=seed,
+                         comparator_enabled=False)
 
     def train(self, aat, levels):
         """aat: int [16] winner indices. levels: int8 [784] target level per pixel."""
@@ -186,7 +190,8 @@ class NeuralLabelClassifier:
     def __init__(self, n_labels=len(LABELS), seed=0):
         self.n_labels = n_labels
         self.core = Core(1, BASIS, spaces_per_lane=N_GROUPS, num_lanes=n_labels,
-                         model="byte", init=INIT, read_noise=0, seed=seed)
+                         model="byte", init=INIT, read_noise=0, seed=seed,
+                         comparator_enabled=False)
 
     def train(self, aat, label):
         a = np.ascontiguousarray(aat, dtype=np.int8)

@@ -15,7 +15,8 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ktram_neural_core.torch import BasisEncoder, Classifier  # noqa: E402
+from ktram_neural_core.torch import BasisEncoder, Classifier, NoiseParams  # noqa: E402
+from ktram_neural_core.torch._lane import V_CMP_DEFAULT  # noqa: E402
 from ktram_neural_core.torch.pack import load_section, quantize  # noqa: E402
 
 from _congruence import record  # noqa: E402
@@ -83,6 +84,10 @@ def test_frozen_read_matches_dequantized_math(tmp_path):
                               "(int8 sums, global scales), bit-exact")
 
 
+# The shipped generator pack was written before the comparator term existed, so loading it
+# warns by design (test_pack_without_a_comparator_key_loads_at_the_default_and_says_so pins
+# that). Filtered here so the warning does not bury the rest of the suite's output.
+@pytest.mark.filterwarnings("ignore:pack has no comparator noise level")
 @pytest.mark.skipif(not WEIGHTS.with_suffix(".npz").exists(),
                     reason="shipped generator weights not present (local artifact)")
 def test_shipped_pack_loads_with_expected_geometry():
@@ -104,6 +109,7 @@ def test_shipped_pack_loads_with_expected_geometry():
                               "decoder [1568,16,64], classifier [10,16,64]); reads run")
 
 
+@pytest.mark.filterwarnings("ignore:pack has no comparator noise level")
 @pytest.mark.skipif(not (WEIGHTS.parent / "generator-weights.json").exists()
                     or not (WEIGHTS.parent / "generator-weights.bin").exists(),
                     reason="browser pack not present (local artifact)")
@@ -123,3 +129,38 @@ def test_browser_pack_agrees_with_npz(tmp_path):
     assert noise["v_fflv"] == pytest.approx(0.05)
     record("both modules", 1, "browser .json/.bin carrier decodes to the same arrays as "
                               "the .npz (all three sections)")
+
+
+def test_comparator_level_round_trips_through_a_pack(tmp_path):
+    # v_cmp is written into the noise block and comes back on load, so a pack carries the read
+    # it was written under rather than picking up whatever the library default happens to be.
+    path = tmp_path / "weights"
+    clf = Classifier(6, 4, 8, seed=1, noise=NoiseParams(v_cmp=3e-3))
+    clf.to_pack(path, "classifier")
+    back = Classifier.from_pack(path, "classifier")
+    assert back.noise.v_cmp == pytest.approx(3e-3)
+
+    _, _, _, _, noise = load_section(path, "classifier")
+    assert noise["v_cmp"] == pytest.approx(3e-3)
+    assert noise["v_fflv"] == pytest.approx(0.05)     # no existing key renamed or dropped
+
+
+def test_pack_without_a_comparator_key_loads_at_the_default_and_says_so(tmp_path):
+    # A pre-comparator pack has no level in it. It loads at the emulator's default rather than
+    # at zero — the comparator is part of the read model, not part of the artifact — and it warns,
+    # because a silently applied default is how a number moves without anyone choosing it.
+    path = tmp_path / "weights"
+    Classifier(6, 4, 8, seed=1).to_pack(path, "classifier")
+
+    npz = path.with_suffix(".npz")
+    with np.load(npz, allow_pickle=False) as data:
+        keys = {k: data[k] for k in data.files if k != "noise_v_cmp"}
+    np.savez(npz, **keys)
+
+    with pytest.warns(UserWarning, match="no comparator noise level"):
+        _, _, _, _, noise = load_section(path, "classifier")
+    assert "v_cmp" not in noise
+
+    with pytest.warns(UserWarning, match="no comparator noise level"):
+        back = Classifier.from_pack(path, "classifier")
+    assert back.noise.v_cmp == pytest.approx(V_CMP_DEFAULT)

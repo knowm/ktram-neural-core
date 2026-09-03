@@ -4,6 +4,12 @@ Each figure overlays the emulator's MEASURED output on the THEORETICAL law it sh
 so the figure is also a test: matching dots-on-a-line means the emulator reproduces the
 Chapter 3b/4 physics. The emphasis is the read noise — the kT — measured against its law.
 
+These figures are about the DEVICE, so every Core here pins comparator_enabled=False. The
+emulator's read law also carries a comparator term (periphery, flat in y and m, 1/|V_app|, on by
+default), which would floor every curve below and is not what the chapter measures. The published
+figures were made before that term existed; the pin is what keeps them reproducible. A comparator
+panel would be a new figure, not a change to these.
+
 Default output_dir is this lesson's own figures/ (gitignored); pass a path to write elsewhere,
 e.g. the 4b website article folder. Run:  python examples/neural-lane-emulator/figures.py
 """
@@ -111,7 +117,7 @@ def fig_pooling(ax=None):
     meas = []
     for N in Ns:
         c = Core(1, 1, spaces_per_lane=N, num_lanes=1, model="float",
-                 init="medium", seed=1, read_noise=READ_NOISE)
+                 init="medium", seed=1, read_noise=READ_NOISE, comparator_enabled=False)
         aat = (0,) * N
         c.set_start_y(0, aat, 0.0, 0.5)               # N equally-confident pairs, w = 0, m = m_ref each
         meas.append(_read_std(c, aat))
@@ -139,7 +145,7 @@ def fig_noise_map(ax=None):
     if own:
         _, ax = plt.subplots(1, 3, figsize=(13, 4.0), sharey=True, constrained_layout=True)
 
-    c = single_synapse_core("float", "medium", seed=1, read_noise=READ_NOISE)
+    c = single_synapse_core("float", "medium", seed=1, read_noise=READ_NOISE, comparator_enabled=False)
     RN, NT, NF = c.read_noise, c.noise_thermal, c.noise_flicker     # gain, thermal & flicker weights
     MREF = c.read_noise_ref_m                                       # reference magnitude (m_ref)
     VFULL = c.forward_low_voltage                                   # full sub-threshold read voltage
@@ -174,7 +180,7 @@ def fig_coin(ax=None):
     if own:
         _, ax = plt.subplots(figsize=(7.0, 4.0))
 
-    core = single_synapse_core("float", "medium", seed=1, read_noise=READ_NOISE)
+    core = single_synapse_core("float", "medium", seed=1, read_noise=READ_NOISE, comparator_enabled=False)
     lane = core.lane(0)
     core.set_start_y(0, Z, 0.0, 0.5)
     sigma = _read_std(core, Z)                        # σ of a normal FFLV read at m_ref

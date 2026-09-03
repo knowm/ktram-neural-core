@@ -26,6 +26,11 @@ import torch
 GMIN = 1
 GMAX = 255
 
+# The comparator's default input-referred noise, in volts: core.COMPARATOR_V_MIN +
+# core.COMPARATOR_CODE * core.COMPARATOR_V_STEP = 100 uV + 10 * 20 uV. Spelled out here rather
+# than imported, the same way GMIN/GMAX are; test_torch_noise pins the two to agree.
+V_CMP_DEFAULT = 300e-6
+
 
 def y_dtype(device):
     """float64 wherever available (bit-matches the oracle's Python floats); float32 on MPS."""
@@ -263,14 +268,20 @@ def rank_cut(y, Vt=0.0, N=None):
 class NoiseParams:
     """The Ch3b read-noise coefficients at read_noise = 1, exactly the export's noise block.
 
-    ``sigma_unit(m, y)`` is the per-read noise scale; the temperature knob T (the Core's
-    read_noise gain) multiplies it linearly. Defaults are the Core's byte-model defaults at
-    room temperature and the FFLV read voltage.
+    ``sigma_unit(m, y)`` is the DEVICE part of the per-read noise scale; the temperature knob T
+    (the Core's read_noise gain) multiplies it linearly. ``v_cmp`` is the comparator that
+    resolves the read — periphery, flat in y and m, NOT multiplied by T — and ``sigma(y, m, T)``
+    is the composite the read actually carries. Defaults are the Core's byte-model defaults at
+    room temperature, the FFLV read voltage, and the comparator's default register setting.
+
+    ``sigma_unit`` stays device-only on purpose: downstream code reads it directly to build its
+    own noise budgets, and folding the comparator into it would make a periphery term scale with
+    the device's gain.
     """
 
     def __init__(self, a_thermal_unit=0.005, a_flicker_unit=1.0,
                  sqrt_ref_m=math.sqrt(GMAX), flicker_ln_ref=6.0 * math.log(10.0),
-                 ref_pw=1e-6, read_pw=1e-6, v_read=0.05):
+                 ref_pw=1e-6, read_pw=1e-6, v_read=0.05, v_cmp=V_CMP_DEFAULT):
         self.a_thermal_unit = float(a_thermal_unit)
         self.a_flicker_unit = float(a_flicker_unit)
         self.sqrt_ref_m = float(sqrt_ref_m)
@@ -278,6 +289,7 @@ class NoiseParams:
         self.ref_pw = float(ref_pw)
         self.read_pw = float(read_pw)
         self.v_read = float(abs(v_read))
+        self.v_cmp = float(v_cmp)
 
     @classmethod
     def from_core(cls, core):
@@ -291,13 +303,15 @@ class NoiseParams:
             ref_pw=core.read_noise_ref_pw,
             read_pw=core.read_pulse_width,
             v_read=abs(core.forward_low_voltage),
+            v_cmp=core.comparator_noise,   # 0 when the Core's comparator is disabled
         )
 
     def state(self):
         """The export's noise block, key for key."""
         return {"a_thermal_unit": self.a_thermal_unit, "a_flicker_unit": self.a_flicker_unit,
                 "sqrt_ref_m": self.sqrt_ref_m, "flicker_ln_ref": self.flicker_ln_ref,
-                "ref_pw": self.ref_pw, "read_pw": self.read_pw, "v_fflv": self.v_read}
+                "ref_pw": self.ref_pw, "read_pw": self.read_pw, "v_fflv": self.v_read,
+                "v_cmp": self.v_cmp}
 
     def sigma_unit(self, y, m):
         """sigma_y at T=1 for a clean read y with total active magnitude m (real device units).
@@ -314,18 +328,43 @@ class NoiseParams:
         sigma = torch.sqrt(s_th * s_th + s_fl * s_fl)
         return torch.where(m > 0, sigma, torch.zeros_like(sigma))
 
+    def sigma(self, y, m, T, comparator=None):
+        """The composite sigma the read carries: device in quadrature with the comparator.
 
-def sample_read(y, m, T, params, generator=None):
-    """The opt-in noisy read: y + T * sigma_unit(m, y) * randn, clipped to [-1, 1].
+            sigma^2 = (T * sigma_unit(y, m))^2 + (v_cmp / |V|)^2
+
+        The comparator term is flat in y and m and is not scaled by T — T is the device's gain.
+        ``comparator=False`` drops it, giving the device-only law exactly. 0 where m <= 0, the
+        same as Core.read_sample: a lane with nothing selected has no comparator decision to make.
+        """
+        s_dev = T * self.sigma_unit(y, m)
+        v_cmp = 0.0 if comparator is False else self.v_cmp
+        if v_cmp == 0.0:
+            return s_dev
+        s_cmp = v_cmp / self.v_read
+        sigma = torch.sqrt(s_dev * s_dev + s_cmp * s_cmp)
+        return torch.where(m > 0, sigma, torch.zeros_like(sigma))
+
+
+def sample_read(y, m, T, params, generator=None, comparator=None):
+    """The opt-in noisy read: y + sigma(y, m, T) * randn, clipped to [-1, 1].
+
+    ``comparator``: ``None`` follows ``params``; ``False`` takes the device-only read. Pass
+    ``False`` where the comparator term is applied deliberately somewhere else, or where the
+    draw is device-only by design — it says so at the call site instead of resting on whatever
+    the params happen to carry, and it does not disturb params other readers share.
+
+    ``T <= 0`` returns the clean read regardless of the comparator, matching the oracle's
+    ``read_noise <= 0``: that is the one deterministic test mode.
 
     RNG is the explicit ``generator`` — no module holds global random state. Draw-for-draw
     matching against the oracle's numpy RNG is a non-goal (spec 08 §8); the law is the contract.
     """
     if T <= 0.0:
         return y
-    sigma = params.sigma_unit(y, m)
+    sigma = params.sigma(y, m, T, comparator=comparator)
     noise = torch.randn(y.shape, generator=generator, dtype=y.dtype, device=y.device)
-    return (y + T * sigma * noise).clamp(-1.0, 1.0)
+    return (y + sigma * noise).clamp(-1.0, 1.0)
 
 
 # ---------------------------------------------------------------------------
