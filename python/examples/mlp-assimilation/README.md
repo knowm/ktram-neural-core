@@ -1,7 +1,6 @@
 # Assimilation of a MLP
 
 Companion to [Chapter 8: Assimilation of a MLP](https://knowm.ai/blog/assimilation-of-a-mlp/).
-The chapter is a draft; its URL becomes public when the article is published.
 
 Train a conventional image classifier, freeze it, and teach three kT-RAM
 `Classifier` banks to approximate its behavior. Compare fitted hidden activation
@@ -190,6 +189,40 @@ lane teaching budgets. It is **not a bit-for-bit historical reproduction**:
 initializations and checkpoint choices differ. The A6/A7 sweeps are recorded
 context, not extra CLI presets. Use repeated seeds and a new final holdout before
 making confirmatory claims in a paper.
+
+## Encoder study
+
+The chapter's encoder results (patch MLP, linear and taught lane encoders, the
+head-only control and the 36,000-image test set) come from two scripts. The
+hidden interfaces stay at 32×16 and 16×16. All configurations share one frozen
+teacher: the `models.pt` from a default Fashion-MNIST run of `experiment.py`.
+
+```bash
+cd python/examples/mlp-assimilation
+T=figures/fashion-mnist-<hash>/models.pt
+
+# Step 1: warm start + learned proxy with the encoder swapped (GPU if present).
+python encoder_screen.py --encoder mlp --S 64 --teacher $T
+python encoder_screen.py --encoder linear --S 64 --teacher $T
+python encoder_screen.py --encoder linear --S 16 --teacher $T
+python encoder_screen.py --encoder a2d --S 64 --teacher $T
+python encoder_screen.py --encoder a2d --S 16 --teacher $T
+
+# Step 2: teach the chain onto fresh lane banks with adapt.
+python encoder_teach.py --screen figures/encoders/a2d-S64-L4-quantile --seed 0
+```
+
+`a2d` quantizes each pixel to four levels (zero, then quantiles of the nonzero
+training pixels) and teaches a grouped lane bank as the encoder, at adapt batch 64;
+the downstream banks use batch 256 and 20/10/10 epochs. For seeds 1 and 2, add
+`--init-seed k` to the screen and pass the matching `--seed k` to the teach on the
+`...-initk` directory; the split and teacher stay fixed. `--smoke` on the screen
+runs the workflow on the digits dataset.
+
+Each `teach-seed<k>.json` reports `test` (the 36,000 images after training and
+validation) and `historical` (the last 2,000, a subset of `test`), with chain
+accuracy, head-only accuracy, symbol agreement and the cost row. Outputs go under
+the ignored `figures/encoders/`.
 
 Regenerate article figures without training or network access:
 
