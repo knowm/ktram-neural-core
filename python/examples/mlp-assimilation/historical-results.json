@@ -1,0 +1,128 @@
+{
+  "description": "Recorded Fashion-MNIST development results from the August 2026 assimilation experiments. These are not outputs of experiment.py. Read README.md for protocol differences and limitations.",
+  "protocol": {
+    "dataset": "Fashion-MNIST, OpenML version 1, pooled 70000 images",
+    "permutation": "numpy.random.default_rng(0).permutation(70000)",
+    "training": "first 32000 indices",
+    "evaluation": "last 2000 indices; repeatedly inspected during development and used for configuration selection",
+    "teacher": "784 -> 64 -> 32 -> 10, ReLU, Adam, 40 epochs, batch 256, learning rate 0.001",
+    "replications": 1,
+    "validation": "No separate validation split in these historical runs",
+    "source": "A0, A3, A4, A6 micro and A7 experiment reports and saved result/checkpoint files, checked against those files when preparing Chapter 8. Private intermediate checkpoints are not required by the public example."
+  },
+  "teacher": {
+    "accuracy": 0.8805,
+    "parameters": 52650,
+    "fp32_bytes": 210600,
+    "macs": 52544
+  },
+  "runs": [
+    {
+      "id": "A3",
+      "label": "Fitted interfaces",
+      "proxy_accuracy": null,
+      "taught_accuracy": 0.786,
+      "teacher_agreement": 0.825,
+      "synapses": 657920,
+      "encoder_parameters": 59392,
+      "encoder_macs": 57856,
+      "input": [
+        16,
+        64
+      ],
+      "hidden1": [
+        32,
+        16
+      ],
+      "hidden2": [
+        16,
+        16
+      ],
+      "note": "A3 trained its digital encoder through a first-stage additive reader against fitted activation codes. No complete end-to-end proxy accuracy was measured. Lane epochs: 10/10/10."
+    },
+    {
+      "id": "A4",
+      "label": "Learned interfaces",
+      "proxy_accuracy": 0.8575,
+      "taught_accuracy": 0.854,
+      "teacher_agreement": 0.8985,
+      "synapses": 657920,
+      "encoder_parameters": 59392,
+      "encoder_macs": 57856,
+      "input": [
+        16,
+        64
+      ],
+      "hidden1": [
+        32,
+        16
+      ],
+      "hidden2": [
+        16,
+        16
+      ],
+      "note": "Base configuration selected over wider second interface by evaluation accuracy. Joint training also updated A3's warm-started encoder. Proxy epochs: 40. Lane epochs: 20/10/10."
+    },
+    {
+      "id": "A6 micro",
+      "label": "Smaller interfaces",
+      "proxy_accuracy": 0.853,
+      "taught_accuracy": 0.846,
+      "teacher_agreement": 0.898,
+      "synapses": 83200,
+      "encoder_parameters": 42496,
+      "encoder_macs": 41472,
+      "input": [
+        16,
+        32
+      ],
+      "hidden1": [
+        8,
+        16
+      ],
+      "hidden2": [
+        8,
+        16
+      ],
+      "note": "7x7 local input windows, hidden width 32. Cold start, 60 proxy epochs. Not a controlled comparison of interface width alone."
+    },
+    {
+      "id": "A7",
+      "label": "Larger input encoder",
+      "proxy_accuracy": 0.8745,
+      "taught_accuracy": 0.8685,
+      "teacher_agreement": 0.9,
+      "synapses": 83200,
+      "encoder_parameters": 158208,
+      "encoder_macs": 156672,
+      "input": [
+        16,
+        32
+      ],
+      "hidden1": [
+        8,
+        16
+      ],
+      "hidden2": [
+        8,
+        16
+      ],
+      "note": "Selected h64w11 encoder: sixteen overlapping 11x11 windows, 64 hidden units per position. Cold start, 60 proxy epochs."
+    }
+  ],
+  "accounting": "Synapse payload = 2 bytes per differential/magnitude pair in an inference pack. Encoder weights and biases = 4 bytes each. Excludes metadata, activations, read caches and software overhead. Historical accuracy describes live emulator banks, not independently evaluated packed exports.",
+  "later_context": {
+    "shared_convolutional_assimilation": {
+      "source_accuracy": 0.9005,
+      "proxy_accuracy": 0.8805,
+      "taught_accuracy": 0.8215,
+      "note": "Recorded assimilation-2 B-series result, separate architecture and protocol; included only to qualify transfer generality."
+    },
+    "masked_denoising_learned_interface": {
+      "one_layer_completion": 0.4186,
+      "two_layer_same_language_completion": 0.4258,
+      "two_layer_learned_interface_completion": 0.4261,
+      "note": "Recorded assimilation-7 S0/S0b masked-slot completion with U(0,1) context retention; no local lane teaching in this screen. These are completion rates, not image classification accuracies."
+    }
+  }
+}
