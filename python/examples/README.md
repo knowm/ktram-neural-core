@@ -1,8 +1,8 @@
 # Examples
 
 Runnable lessons for [`ktram-neural-core`](https://pypi.org/project/ktram-neural-core/).
-Each folder is one lesson: a Colab-ready notebook plus the script that regenerates that
-lesson's article figures. Shared plumbing is in `_common/`.
+Each folder is one lesson, with a notebook, runnable experiment, or figure script.
+Shared plumbing is in `_common/`.
 
 ## Layout
 
@@ -33,6 +33,9 @@ examples/
     demo.py              #   the L1 recoder end to end: encode -> adapt -> read, (Vt, N)
   aat-codec/             # the AAT Codec meeting the torch lanes (spec 08)
     lane_bridge.py       #   floats -> codec AATs -> Classifier adapt/read, end to end
+  mlp-assimilation/      # companion to "Chapter 8: Assimilation of a MLP"
+    experiment.py        #   frozen teacher -> learned interfaces -> local lane teaching
+    figures.py           #   recorded article figures or a new run's results
   instructions/
     compare_instructions.ipynb
   device-physics/
@@ -42,6 +45,9 @@ examples/
 New lessons get a new topic-named folder (not a number — they track topics, not publish
 order, so an add-on can slot in without renumbering anything). Put shared code in `_common/`;
 keep lesson-specific code in the lesson folder.
+
+The [MLP assimilation experiment](mlp-assimilation/README.md) includes an offline
+smoke run, a full Fashion-MNIST comparison, and inference checkpoints.
 
 ## Running
 
